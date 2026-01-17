@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "dev:all": "./scripts/dev.sh",
-    "build": "astro build",
+    "build": "astro build && node scripts/fix-routes.js",
     "preview": "astro preview",
     "astro": "astro",
     "typecheck": "astro check && tsc --noEmit",

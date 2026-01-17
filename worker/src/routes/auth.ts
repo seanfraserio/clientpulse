@@ -211,7 +211,15 @@ auth.post('/logout', async (c) => {
 // ═══════════════════════════════════════════════════════════
 
 auth.get('/me', async (c) => {
-  const sessionToken = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+  // Check Authorization header first, then fall back to cookie
+  const authHeader = c.req.header('Authorization');
+  let sessionToken: string | undefined;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    sessionToken = authHeader.slice(7);
+  } else {
+    sessionToken = c.req.header('Cookie')?.match(/session=([^;]+)/)?.[1];
+  }
 
   if (!sessionToken) {
     return c.json({ user: null });

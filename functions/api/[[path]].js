@@ -3,13 +3,20 @@
 
 const API_URL = 'https://clientpulse-api.sfraser.workers.dev';
 
-export const onRequest: PagesFunction = async (context) => {
+export async function onRequest(context) {
   const { request, params } = context;
 
   // Build the target URL
   const path = Array.isArray(params.path) ? params.path.join('/') : params.path || '';
   const url = new URL(request.url);
   const targetUrl = `${API_URL}/api/${path}${url.search}`;
+
+  // Get the cookie header from the incoming request
+  const cookieHeader = request.headers.get('cookie');
+
+  // Log for debugging
+  console.log(`[Proxy] ${request.method} ${path}`);
+  console.log(`[Proxy] Cookie header: ${cookieHeader ? cookieHeader.substring(0, 50) + '...' : 'NONE'}`);
 
   // Create new headers, explicitly copying all headers including cookies
   const headers = new Headers();
@@ -28,6 +35,8 @@ export const onRequest: PagesFunction = async (context) => {
   // Forward the request to the API
   const response = await fetch(proxyRequest);
 
+  console.log(`[Proxy] Response status: ${response.status}`);
+
   // Create a new response with the same body and status
   const proxyResponse = new Response(response.body, {
     status: response.status,
@@ -36,4 +45,4 @@ export const onRequest: PagesFunction = async (context) => {
   });
 
   return proxyResponse;
-};
+}

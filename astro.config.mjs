@@ -15,7 +15,8 @@ export default defineConfig({
     mode: 'directory',
     routes: {
       strategy: 'include',
-      include: ['/clients/*', '/clients/*/edit']
+      include: ['/clients/*', '/clients/*/edit'],
+      exclude: ['/api/*']
     }
   }),
   build: {

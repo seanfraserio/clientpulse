@@ -6,10 +6,18 @@ import type { AppEnv } from '../index';
 
 /**
  * Authentication middleware
- * Validates session cookie and injects user + tenant-aware DB into context
+ * Validates session from Authorization header or cookie and injects user + tenant-aware DB into context
  */
 export async function authMiddleware(c: Context<AppEnv>, next: Next) {
-  const sessionToken = getCookie(c, 'session');
+  // Check Authorization header first, then fall back to cookie
+  const authHeader = c.req.header('Authorization');
+  let sessionToken: string | undefined;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    sessionToken = authHeader.slice(7);
+  } else {
+    sessionToken = getCookie(c, 'session');
+  }
 
   if (!sessionToken) {
     return c.json({ error: 'Unauthorized', message: 'No session token' }, 401);
@@ -69,7 +77,15 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
  * Useful for endpoints that work differently for logged-in vs anonymous users
  */
 export async function optionalAuthMiddleware(c: Context<AppEnv>, next: Next) {
-  const sessionToken = getCookie(c, 'session');
+  // Check Authorization header first, then fall back to cookie
+  const authHeader = c.req.header('Authorization');
+  let sessionToken: string | undefined;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    sessionToken = authHeader.slice(7);
+  } else {
+    sessionToken = getCookie(c, 'session');
+  }
 
   if (sessionToken) {
     const result = await c.env.DB.prepare(`

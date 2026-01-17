@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, removeSessionToken } from '../lib/api';
 
 interface NavigationProps {
   requireAuth?: boolean;
@@ -28,6 +28,12 @@ export default function Navigation({ requireAuth = false }: NavigationProps) {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        // If requireAuth and no user returned, redirect to login
+        if (requireAuth && !data.user) {
+          console.log('[Auth] No user in response, redirecting to login');
+          window.location.href = '/login';
+          return;
+        }
       } else if (requireAuth) {
         window.location.href = '/login';
       }
@@ -44,9 +50,12 @@ export default function Navigation({ requireAuth = false }: NavigationProps) {
   async function handleLogout() {
     try {
       await apiFetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/';
     } catch (error) {
       console.error('Logout failed:', error);
+    } finally {
+      // Always clear local session token and redirect
+      removeSessionToken();
+      window.location.href = '/';
     }
   }
 

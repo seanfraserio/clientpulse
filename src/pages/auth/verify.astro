@@ -55,10 +55,8 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script>
-  function setCookie(name, value, days) {
-    const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
-    // Set cookie with secure flags for same-site requests through proxy
-    document.cookie = `${name}=${value}; expires=${expires}; path=/; Secure; SameSite=Lax`;
+  function setSessionToken(token) {
+    localStorage.setItem('session_token', token);
   }
 
   async function handleAuth() {
@@ -74,8 +72,10 @@ import Layout from '../../layouts/Layout.astro';
 
     // Case 1: OAuth callback with session token
     if (sessionToken) {
-      // Set the session cookie on this domain
-      setCookie('session', sessionToken, 7);
+      // Store the session token in localStorage
+      setSessionToken(sessionToken);
+
+      console.log('[Verify] Session token stored in localStorage');
 
       // Show success and redirect
       verifyingEl?.classList.add('hidden');
@@ -106,9 +106,9 @@ import Layout from '../../layouts/Layout.astro';
         throw new Error(data.error || 'Verification failed');
       }
 
-      // If we got a session token, set the cookie
+      // If we got a session token, store it in localStorage
       if (data.sessionToken) {
-        setCookie('session', data.sessionToken, 7);
+        setSessionToken(data.sessionToken);
       }
 
       // Success - show success state and redirect
