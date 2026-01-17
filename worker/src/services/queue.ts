@@ -187,7 +187,7 @@ async function processNote(data: AIProcessingMessage, env: Env): Promise<void> {
 
 async function callCloudflareAI(ai: Ai, prompt: string): Promise<AIAnalysis> {
   const response = await ai.run(
-    '@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof ai.run>[0],
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast' as Parameters<typeof ai.run>[0],
     {
       messages: [
         { role: 'user', content: prompt }
@@ -196,7 +196,28 @@ async function callCloudflareAI(ai: Ai, prompt: string): Promise<AIAnalysis> {
     }
   );
 
-  const text = (response as { response: string }).response;
+  console.log('Cloudflare AI response:', JSON.stringify(response));
+
+  // Handle different response formats from different models
+  let text: string;
+  const resp = response as Record<string, unknown>;
+
+  if (resp.response) {
+    // Llama-style response
+    text = resp.response as string;
+  } else if (resp.choices && Array.isArray(resp.choices)) {
+    // OpenAI-style response (Qwen3 may use this)
+    const choices = resp.choices as Array<{ message?: { content: string }; text?: string }>;
+    text = choices[0]?.message?.content || choices[0]?.text || '';
+  } else {
+    console.error('Unexpected AI response format:', resp);
+    throw new Error('Unexpected AI response format');
+  }
+
+  if (!text) {
+    throw new Error('Empty response from AI');
+  }
+
   return parseAIResponse(text);
 }
 
