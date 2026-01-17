@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from '../lib/api';
 
 interface FormData {
   name: string;
@@ -84,10 +85,9 @@ export default function ClientForm({ clientId, initialData }: Props) {
       const url = isEditing ? `/api/clients/${clientId}` : '/api/clients';
       const method = isEditing ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(payload)
       });
 

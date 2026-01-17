@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../lib/api';
 import ClientTimeline from './ClientTimeline';
 import ClientActions from './ClientActions';
 import HealthScoreRing from './HealthScoreRing';
@@ -43,7 +44,7 @@ export default function ClientDetail({ clientId }: Props) {
 
   async function fetchClient() {
     try {
-      const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
+      const res = await apiFetch(`/api/clients/${clientId}`);
       if (!res.ok) {
         if (res.status === 404) throw new Error('Client not found');
         throw new Error('Failed to load client');

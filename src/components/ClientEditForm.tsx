@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../lib/api';
 
 interface Client {
   id: string;
@@ -40,7 +41,7 @@ export default function ClientEditForm({ clientId }: Props) {
 
   async function fetchClient() {
     try {
-      const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
+      const res = await apiFetch(`/api/clients/${clientId}`);
       if (!res.ok) {
         if (res.status === 404) throw new Error('Client not found');
         throw new Error('Failed to load client');
@@ -97,10 +98,9 @@ export default function ClientEditForm({ clientId }: Props) {
         .map(t => t.trim())
         .filter(t => t.length > 0);
 
-      const res = await fetch(`/api/clients/${clientId}`, {
+      const res = await apiFetch(`/api/clients/${clientId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           name: formData.name.trim(),
           company: formData.company.trim() || null,
@@ -128,9 +128,8 @@ export default function ClientEditForm({ clientId }: Props) {
   async function handleDelete() {
     setDeleting(true);
     try {
-      const res = await fetch(`/api/clients/${clientId}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      const res = await apiFetch(`/api/clients/${clientId}`, {
+        method: 'DELETE'
       });
 
       if (!res.ok) {
