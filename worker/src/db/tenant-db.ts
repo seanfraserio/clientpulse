@@ -416,7 +416,8 @@ export class TenantDB {
       ...row,
       tags: JSON.parse(row.tags as string || '[]'),
       ai_personal_details: JSON.parse(row.ai_personal_details as string || '[]'),
-      health_signals: JSON.parse(row.health_signals as string || '[]')
+      health_signals: JSON.parse(row.health_signals as string || '[]'),
+      digest_enabled: row.digest_enabled === 1 || row.digest_enabled === true
     } as Client;
   }
 

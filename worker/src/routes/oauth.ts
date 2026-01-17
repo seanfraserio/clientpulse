@@ -1,9 +1,13 @@
 import { Hono } from 'hono';
-import { generateToken, generateId } from '../utils/crypto';
+import { generateToken, generateId, sha256 } from '../utils/crypto';
 import type { AppEnv } from '../index';
 import type { OAuthProvider } from '@shared/types';
 
 const oauth = new Hono<AppEnv>();
+
+// Session timeouts (must match auth.ts)
+const ABSOLUTE_SESSION_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ═══════════════════════════════════════════════════════════
 // OAuth Configuration
@@ -135,23 +139,41 @@ async function createSessionAndRedirect(
   c: any,
   userId: string
 ): Promise<Response> {
-  // Create session token
+  // Create session token with hash for secure storage
   const sessionToken = generateToken(32);
-  const sessionExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const sessionTokenHash = await sha256(sessionToken);
+  const sessionExpires = new Date(Date.now() + SESSION_TIMEOUT_MS);
+  const absoluteExpires = new Date(Date.now() + ABSOLUTE_SESSION_TIMEOUT_MS);
 
   await c.env.DB.prepare(`
-    INSERT INTO auth_tokens (id, user_id, token, type, expires_at)
-    VALUES (?, ?, ?, 'session', ?)
-  `).bind(generateId(), userId, sessionToken, sessionExpires.toISOString()).run();
+    INSERT INTO auth_tokens (id, user_id, token, token_hash, type, expires_at, absolute_expires_at)
+    VALUES (?, ?, ?, ?, 'session', ?, ?)
+  `).bind(
+    generateId(),
+    userId,
+    sessionToken,
+    sessionTokenHash,
+    sessionExpires.toISOString(),
+    absoluteExpires.toISOString()
+  ).run();
 
   // Update last login
   await c.env.DB.prepare(`
     UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?
   `).bind(userId).run();
 
-  // Redirect to frontend verify page with session token
-  // The frontend will set the cookie on its own domain
-  return c.redirect(`${c.env.APP_URL}/auth/verify?session=${sessionToken}`);
+  // Create one-time exchange code (expires in 5 minutes)
+  // This prevents session token from appearing in URL
+  const exchangeCode = generateToken(16);
+  const exchangeExpires = new Date(Date.now() + 5 * 60 * 1000);
+
+  await c.env.DB.prepare(`
+    INSERT INTO exchange_codes (id, code, session_token_hash, expires_at)
+    VALUES (?, ?, ?, ?)
+  `).bind(generateId(), exchangeCode, sessionTokenHash, exchangeExpires.toISOString()).run();
+
+  // Redirect to frontend verify page with exchange code (not session token!)
+  return c.redirect(`${c.env.APP_URL}/auth/verify?code=${exchangeCode}`);
 }
 
 // ═══════════════════════════════════════════════════════════

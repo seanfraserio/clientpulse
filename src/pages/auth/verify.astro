@@ -1,9 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 
-// This page handles both:
+// This page handles:
 // 1. Magic link verification (token param)
-// 2. OAuth session setup (session param)
+// 2. OAuth exchange code (code param) - exchanges for session token
 // URL params are read client-side since this is a static site
 ---
 
@@ -55,76 +55,100 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script>
-  function setSessionToken(token) {
+  const API_URL = 'https://clientpulse-api.sfraser.workers.dev';
+
+  function setSessionToken(token: string) {
     localStorage.setItem('session_token', token);
   }
 
-  async function handleAuth() {
-    const verifyingEl = document.getElementById('verifying-state');
-    const successEl = document.getElementById('success-state');
-    const errorEl = document.getElementById('error-state');
-    const errorMsgEl = document.getElementById('error-message');
+  function showSuccess() {
+    document.getElementById('verifying-state')?.classList.add('hidden');
+    document.getElementById('success-state')?.classList.remove('hidden');
+    setTimeout(() => {
+      window.location.href = '/dashboard';
+    }, 1000);
+  }
 
+  function showError(message: string) {
+    document.getElementById('verifying-state')?.classList.add('hidden');
+    document.getElementById('error-state')?.classList.remove('hidden');
+    const errorMsgEl = document.getElementById('error-message');
+    if (errorMsgEl) errorMsgEl.textContent = message;
+  }
+
+  async function exchangeCode(code: string): Promise<string> {
+    const res = await fetch(`${API_URL}/api/auth/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Exchange failed');
+    }
+
+    if (!data.sessionToken) {
+      throw new Error('No session token received');
+    }
+
+    return data.sessionToken;
+  }
+
+  async function verifyMagicLink(token: string): Promise<string> {
+    const res = await fetch(`${API_URL}/api/auth/verify?token=${encodeURIComponent(token)}&returnToken=true`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Verification failed');
+    }
+
+    if (!data.sessionToken) {
+      throw new Error('No session token received');
+    }
+
+    return data.sessionToken;
+  }
+
+  async function handleAuth() {
     // Read URL params client-side (since this is a static site)
     const urlParams = new URLSearchParams(window.location.search);
-    const sessionToken = urlParams.get('session');
-    const token = urlParams.get('token');
+    const code = urlParams.get('code');      // OAuth exchange code
+    const token = urlParams.get('token');    // Magic link token
 
-    // Case 1: OAuth callback with session token
-    if (sessionToken) {
-      // Store the session token in localStorage
-      setSessionToken(sessionToken);
-
-      console.log('[Verify] Session token stored in localStorage');
-
-      // Show success and redirect
-      verifyingEl?.classList.add('hidden');
-      successEl?.classList.remove('hidden');
-
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1000);
+    // Case 1: OAuth callback with exchange code
+    if (code) {
+      try {
+        console.log('[Verify] Exchanging OAuth code for session');
+        const sessionToken = await exchangeCode(code);
+        setSessionToken(sessionToken);
+        console.log('[Verify] Session token stored');
+        showSuccess();
+      } catch (err) {
+        console.error('[Verify] Exchange failed:', err);
+        showError(err instanceof Error ? err.message : 'OAuth verification failed');
+      }
       return;
     }
 
     // Case 2: Magic link verification
-    if (!token) {
-      verifyingEl?.classList.add('hidden');
-      errorEl?.classList.remove('hidden');
-      if (errorMsgEl) errorMsgEl.textContent = 'No verification token provided.';
+    if (token) {
+      try {
+        console.log('[Verify] Verifying magic link');
+        const sessionToken = await verifyMagicLink(token);
+        setSessionToken(sessionToken);
+        console.log('[Verify] Session token stored');
+        showSuccess();
+      } catch (err) {
+        console.error('[Verify] Magic link verification failed:', err);
+        showError(err instanceof Error ? err.message : 'Link expired or invalid');
+      }
       return;
     }
 
-    try {
-      // Call the API to verify magic link and get session token
-      const API_URL = 'https://clientpulse-api.sfraser.workers.dev';
-      const res = await fetch(`${API_URL}/api/auth/verify?token=${encodeURIComponent(token)}&returnToken=true`);
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Verification failed');
-      }
-
-      // If we got a session token, store it in localStorage
-      if (data.sessionToken) {
-        setSessionToken(data.sessionToken);
-      }
-
-      // Success - show success state and redirect
-      verifyingEl?.classList.add('hidden');
-      successEl?.classList.remove('hidden');
-
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1500);
-    } catch (err) {
-      verifyingEl?.classList.add('hidden');
-      errorEl?.classList.remove('hidden');
-      if (errorMsgEl && err instanceof Error) {
-        errorMsgEl.textContent = err.message;
-      }
-    }
+    // No token or code provided
+    showError('No verification token provided.');
   }
 
   handleAuth();

@@ -1,10 +1,33 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { TenantDB } from '../db/tenant-db';
+import { isValidId, parseLimit } from '../utils/validation';
 import type { AppEnv } from '../index';
 import type { User, AIProcessingMessage } from '@shared/types';
 
 const notes = new Hono<AppEnv>();
+
+// ═══════════════════════════════════════════════════════════
+// Column Allowlist for Safe Updates
+// Maps camelCase input keys to snake_case DB column names
+// ═══════════════════════════════════════════════════════════
+
+const NOTE_UPDATE_COLUMNS: Record<string, string> = {
+  noteType: 'note_type',
+  title: 'title',
+  meetingDate: 'meeting_date',
+  meetingType: 'meeting_type',
+  durationMinutes: 'duration_minutes',
+  attendees: 'attendees',
+  summary: 'summary',
+  discussed: 'discussed',
+  decisions: 'decisions',
+  actionItemsRaw: 'action_items_raw',
+  concerns: 'concerns',
+  personalNotes: 'personal_notes',
+  nextSteps: 'next_steps',
+  mood: 'mood'
+} as const;
 
 // ═══════════════════════════════════════════════════════════
 // Validation Schemas
@@ -139,6 +162,10 @@ notes.get('/:id', async (c) => {
   const db = c.get('db') as TenantDB;
   const noteId = c.req.param('id');
 
+  if (!isValidId(noteId)) {
+    return c.json({ error: 'Invalid note ID format' }, 400);
+  }
+
   const note = await db.getNote(noteId);
   if (!note) {
     return c.json({ error: 'Note not found' }, 404);
@@ -155,6 +182,11 @@ notes.put('/:id', async (c) => {
   const db = c.get('db') as TenantDB;
   const user = c.get('user') as User;
   const noteId = c.req.param('id');
+
+  if (!isValidId(noteId)) {
+    return c.json({ error: 'Invalid note ID format' }, 400);
+  }
+
   const body = await c.req.json();
 
   // Validate input
@@ -181,8 +213,13 @@ notes.put('/:id', async (c) => {
 
   for (const [key, value] of Object.entries(parsed.data)) {
     if (value !== undefined) {
-      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-      updates.push(`${dbKey} = ?`);
+      // Use allowlist for column mapping to prevent SQL injection
+      const dbColumn = NOTE_UPDATE_COLUMNS[key];
+      if (!dbColumn) {
+        // Skip unknown keys (shouldn't happen due to Zod validation, but defense in depth)
+        continue;
+      }
+      updates.push(`${dbColumn} = ?`);
       params.push(Array.isArray(value) ? JSON.stringify(value) : value);
     }
   }
@@ -235,6 +272,10 @@ notes.delete('/:id', async (c) => {
   const user = c.get('user') as User;
   const noteId = c.req.param('id');
 
+  if (!isValidId(noteId)) {
+    return c.json({ error: 'Invalid note ID format' }, 400);
+  }
+
   const result = await c.env.DB.prepare(`
     DELETE FROM notes WHERE id = ? AND user_id = ?
   `).bind(noteId, user.id).run();
@@ -260,6 +301,11 @@ notes.post('/:id/retry-ai', async (c) => {
   const user = c.get('user') as User;
   const noteId = c.req.param('id');
 
+  // Validate ID format early
+  if (!isValidId(noteId)) {
+    return c.json({ error: 'Invalid note ID format' }, 400);
+  }
+
   const note = await db.getNote(noteId);
   if (!note) {
     return c.json({ error: 'Note not found' }, 404);
@@ -269,10 +315,14 @@ notes.post('/:id/retry-ai', async (c) => {
     return c.json({ error: 'Note is not in failed state' }, 400);
   }
 
-  // Reset AI status
-  await c.env.DB.prepare(`
-    UPDATE notes SET ai_status = 'pending', ai_error = NULL WHERE id = ?
-  `).bind(noteId).run();
+  // Reset AI status (include user_id to prevent IDOR)
+  const result = await c.env.DB.prepare(`
+    UPDATE notes SET ai_status = 'pending', ai_error = NULL WHERE id = ? AND user_id = ?
+  `).bind(noteId, user.id).run();
+
+  if (result.meta.changes === 0) {
+    return c.json({ error: 'Note not found or access denied' }, 404);
+  }
 
   // Queue for processing
   const message: AIProcessingMessage = {

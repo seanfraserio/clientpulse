@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { TenantDB } from '../db/tenant-db';
+import { isValidId, isValidStatus, parseLimit } from '../utils/validation';
 import type { AppEnv } from '../index';
 import type { User } from '@shared/types';
 
@@ -31,13 +32,18 @@ const UpdateClientSchema = CreateClientSchema.partial().extend({
 
 clients.get('/', async (c) => {
   const db = c.get('db') as TenantDB;
-  const status = c.req.query('status') || 'active';
-  const limit = parseInt(c.req.query('limit') || '50');
+  const statusParam = c.req.query('status') || 'active';
+  const limit = parseLimit(c.req.query('limit'));
   const cursor = c.req.query('cursor');
 
+  // Validate status parameter
+  if (!isValidStatus(statusParam)) {
+    return c.json({ error: 'Invalid status parameter' }, 400);
+  }
+
   const clientList = await db.listClients({
-    status,
-    limit: Math.min(limit, 100),
+    status: statusParam,
+    limit,
     cursor
   });
 
@@ -111,6 +117,10 @@ clients.get('/:id', async (c) => {
   const db = c.get('db') as TenantDB;
   const clientId = c.req.param('id');
 
+  if (!isValidId(clientId)) {
+    return c.json({ error: 'Invalid client ID format' }, 400);
+  }
+
   const client = await db.getClient(clientId);
   if (!client) {
     return c.json({ error: 'Client not found' }, 404);
@@ -138,6 +148,11 @@ clients.get('/:id', async (c) => {
 clients.put('/:id', async (c) => {
   const db = c.get('db') as TenantDB;
   const clientId = c.req.param('id');
+
+  if (!isValidId(clientId)) {
+    return c.json({ error: 'Invalid client ID format' }, 400);
+  }
+
   const body = await c.req.json();
 
   // Validate input
@@ -168,6 +183,10 @@ clients.delete('/:id', async (c) => {
   const db = c.get('db') as TenantDB;
   const clientId = c.req.param('id');
 
+  if (!isValidId(clientId)) {
+    return c.json({ error: 'Invalid client ID format' }, 400);
+  }
+
   const success = await db.archiveClient(clientId);
   if (!success) {
     return c.json({ error: 'Client not found' }, 404);
@@ -183,7 +202,11 @@ clients.delete('/:id', async (c) => {
 clients.get('/:id/timeline', async (c) => {
   const db = c.get('db') as TenantDB;
   const clientId = c.req.param('id');
-  const limit = parseInt(c.req.query('limit') || '20');
+  const limit = parseLimit(c.req.query('limit'), 20);
+
+  if (!isValidId(clientId)) {
+    return c.json({ error: 'Invalid client ID format' }, 400);
+  }
 
   const client = await db.getClient(clientId);
   if (!client) {
@@ -201,12 +224,58 @@ clients.get('/:id/timeline', async (c) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// PATCH /api/clients/:id/digest - Toggle digest inclusion
+// ═══════════════════════════════════════════════════════════
+
+clients.patch('/:id/digest', async (c) => {
+  const db = c.get('db') as TenantDB;
+  const clientId = c.req.param('id');
+
+  if (!isValidId(clientId)) {
+    return c.json({ error: 'Invalid client ID format' }, 400);
+  }
+
+  const body = await c.req.json();
+
+  // Validate input
+  const enabled = body.enabled;
+  if (typeof enabled !== 'boolean') {
+    return c.json({ error: 'enabled must be a boolean' }, 400);
+  }
+
+  // Get client to verify ownership
+  const client = await db.getClient(clientId);
+  if (!client) {
+    return c.json({ error: 'Client not found' }, 404);
+  }
+
+  // Update digest_enabled - need direct DB access for this specific field
+  const user = c.get('user') as User;
+  const rawDb = (c.env as { DB: D1Database }).DB;
+
+  await rawDb.prepare(`
+    UPDATE clients SET digest_enabled = ? WHERE id = ? AND user_id = ?
+  `).bind(enabled ? 1 : 0, clientId, user.id).run();
+
+  return c.json({
+    data: {
+      id: clientId,
+      digest_enabled: enabled
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════
 // GET /api/clients/:id/health - Health score breakdown
 // ═══════════════════════════════════════════════════════════
 
 clients.get('/:id/health', async (c) => {
   const db = c.get('db') as TenantDB;
   const clientId = c.req.param('id');
+
+  if (!isValidId(clientId)) {
+    return c.json({ error: 'Invalid client ID format' }, 400);
+  }
 
   const client = await db.getClient(clientId);
   if (!client) {

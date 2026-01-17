@@ -52,6 +52,9 @@ export interface Client {
   total_meetings: number;
   client_since: string | null;
 
+  // Digest settings
+  digest_enabled: boolean;
+
   // Metadata
   created_at: string;
   updated_at: string;

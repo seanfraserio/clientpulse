@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { TenantDB } from '../db/tenant-db';
+import { isValidId, parseLimit } from '../utils/validation';
 import type { AppEnv } from '../index';
 import type { User } from '@shared/types';
 
@@ -34,13 +35,28 @@ actions.get('/', async (c) => {
   const status = c.req.query('status');
   const owner = c.req.query('owner');
   const clientId = c.req.query('clientId');
-  const limit = parseInt(c.req.query('limit') || '100');
+  const limit = parseLimit(c.req.query('limit'), 100, 200);
+
+  // Validate clientId if provided
+  if (clientId && !isValidId(clientId)) {
+    return c.json({ error: 'Invalid client ID format' }, 400);
+  }
+
+  // Validate status if provided
+  if (status && !['open', 'completed', 'cancelled'].includes(status)) {
+    return c.json({ error: 'Invalid status parameter' }, 400);
+  }
+
+  // Validate owner if provided
+  if (owner && !['me', 'client'].includes(owner)) {
+    return c.json({ error: 'Invalid owner parameter' }, 400);
+  }
 
   const actionList = await db.listActions({
     status,
     owner,
     clientId,
-    limit: Math.min(limit, 200)
+    limit
   });
 
   return c.json({ data: actionList });
@@ -103,6 +119,10 @@ actions.get('/:id', async (c) => {
   const db = c.get('db') as TenantDB;
   const actionId = c.req.param('id');
 
+  if (!isValidId(actionId)) {
+    return c.json({ error: 'Invalid action ID format' }, 400);
+  }
+
   const action = await db.getAction(actionId);
   if (!action) {
     return c.json({ error: 'Action item not found' }, 404);
@@ -118,6 +138,11 @@ actions.get('/:id', async (c) => {
 actions.put('/:id', async (c) => {
   const user = c.get('user') as User;
   const actionId = c.req.param('id');
+
+  if (!isValidId(actionId)) {
+    return c.json({ error: 'Invalid action ID format' }, 400);
+  }
+
   const body = await c.req.json();
 
   // Validate input
@@ -187,6 +212,10 @@ actions.post('/:id/complete', async (c) => {
   const db = c.get('db') as TenantDB;
   const actionId = c.req.param('id');
 
+  if (!isValidId(actionId)) {
+    return c.json({ error: 'Invalid action ID format' }, 400);
+  }
+
   const action = await db.completeAction(actionId);
   if (!action) {
     return c.json({ error: 'Action item not found' }, 404);
@@ -202,6 +231,10 @@ actions.post('/:id/complete', async (c) => {
 actions.delete('/:id', async (c) => {
   const user = c.get('user') as User;
   const actionId = c.req.param('id');
+
+  if (!isValidId(actionId)) {
+    return c.json({ error: 'Invalid action ID format' }, 400);
+  }
 
   const result = await c.env.DB.prepare(`
     DELETE FROM action_items WHERE id = ? AND user_id = ?

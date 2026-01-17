@@ -261,10 +261,46 @@ async function callGeminiAI(apiKey: string, model: string, prompt: string): Prom
 function buildAnalysisPrompt(note: Record<string, unknown>): string {
   const sanitize = (text: string | null | undefined): string => {
     if (!text) return '';
+
+    // Comprehensive prompt injection sanitization
     return text
+      // Remove zero-width and invisible characters
+      .replace(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g, '')
+      // Remove RTLO/LTRO direction override characters
+      .replace(/[\u202A-\u202E\u2066-\u2069]/g, '')
+      // Llama-style instruction markers
       .replace(/\[INST\]/gi, '[text]')
       .replace(/\[\/INST\]/gi, '[/text]')
       .replace(/<<SYS>>/gi, '[sys]')
+      .replace(/<<\/SYS>>/gi, '[/sys]')
+      // Claude-style markers
+      .replace(/\[HUMAN\]/gi, '[user]')
+      .replace(/\[ASSISTANT\]/gi, '[response]')
+      .replace(/Human:/gi, 'Person:')
+      .replace(/Assistant:/gi, 'Response:')
+      // ChatML-style markers
+      .replace(/<\|im_start\|>/gi, '[start]')
+      .replace(/<\|im_end\|>/gi, '[end]')
+      .replace(/<\|system\|>/gi, '[sys]')
+      .replace(/<\|user\|>/gi, '[usr]')
+      .replace(/<\|assistant\|>/gi, '[asst]')
+      // Other model markers
+      .replace(/<\|endoftext\|>/gi, '[eot]')
+      .replace(/<\|pad\|>/gi, '')
+      .replace(/###\s*(System|User|Assistant|Human|Response):/gi, '### Note:')
+      // Common injection phrases (case insensitive)
+      .replace(/ignore\s+(previous|all|above|prior)\s+(instructions?|prompts?|rules?)/gi, '[filtered]')
+      .replace(/disregard\s+(previous|all|above|prior)/gi, '[filtered]')
+      .replace(/new\s+instructions?:?/gi, '[filtered]')
+      .replace(/you\s+are\s+now/gi, '[filtered]')
+      .replace(/pretend\s+(to\s+be|you\s+are)/gi, '[filtered]')
+      .replace(/act\s+as\s+(if|a)/gi, '[filtered]')
+      .replace(/roleplay\s+as/gi, '[filtered]')
+      .replace(/system\s*prompt:?/gi, '[filtered]')
+      .replace(/override:?/gi, '[note]')
+      // Escape any remaining angle brackets that might form tags
+      .replace(/<([a-z])/gi, '&lt;$1')
+      // Limit length
       .substring(0, 3000);
   };
 

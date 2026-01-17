@@ -15,7 +15,9 @@ import billing from './routes/billing';
 import webhooks from './routes/webhooks';
 import { authMiddleware } from './middleware/auth';
 import { rateLimitMiddleware } from './middleware/rate-limit';
+import { contentTypeMiddleware } from './middleware/content-type';
 import { handleAIQueue } from './services/queue';
+import { sendDueDigests, recalculateAllHealth } from './services/cron';
 
 // ═══════════════════════════════════════════════════════════
 // Type Definitions
@@ -72,7 +74,7 @@ app.use('*', cors({
     return allowed.includes(origin) ? origin : allowed[0];
   },
   credentials: true,
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
   exposeHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
 }));
@@ -105,6 +107,7 @@ app.route('/api/webhooks', webhooks);
 // ═══════════════════════════════════════════════════════════
 
 const protectedApi = new Hono<AppEnv>();
+protectedApi.use('*', contentTypeMiddleware);
 protectedApi.use('*', authMiddleware);
 
 protectedApi.route('/clients', clients);
@@ -159,23 +162,21 @@ export default {
 
   // Cron triggers
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    const hour = new Date().getUTCHours();
-
     switch (event.cron) {
       case '0 * * * *':
         // Hourly: Check for daily digests to send
-        console.log('Running hourly digest check');
-        // await sendDueDigests(env);
+        console.log('[Scheduled] Running hourly digest check');
+        ctx.waitUntil(sendDueDigests(env));
         break;
 
       case '0 3 * * *':
         // 3am UTC: Nightly health recalculation
-        console.log('Running nightly health recalculation');
-        // await recalculateAllHealth(env);
+        console.log('[Scheduled] Running nightly health recalculation');
+        ctx.waitUntil(recalculateAllHealth(env));
         break;
 
       default:
-        console.log(`Unknown cron trigger: ${event.cron}`);
+        console.log(`[Scheduled] Unknown cron trigger: ${event.cron}`);
     }
   }
 };

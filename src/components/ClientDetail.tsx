@@ -25,6 +25,7 @@ interface Client {
   health_signals: HealthSignal[];
   last_contact_at: string | null;
   ai_personal_details: string[];
+  digest_enabled: boolean;
   created_at: string;
 }
 
@@ -37,6 +38,7 @@ export default function ClientDetail({ clientId }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'timeline' | 'actions' | 'details'>('timeline');
+  const [digestToggling, setDigestToggling] = useState(false);
 
   useEffect(() => {
     fetchClient();
@@ -55,6 +57,26 @@ export default function ClientDetail({ clientId }: Props) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function toggleDigest() {
+    if (!client || digestToggling) return;
+
+    setDigestToggling(true);
+    try {
+      const res = await apiFetch(`/api/clients/${client.id}/digest`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: !client.digest_enabled })
+      });
+
+      if (res.ok) {
+        setClient({ ...client, digest_enabled: !client.digest_enabled });
+      }
+    } catch (err) {
+      console.error('Failed to toggle digest:', err);
+    } finally {
+      setDigestToggling(false);
     }
   }
 
@@ -310,6 +332,30 @@ export default function ClientDetail({ clientId }: Props) {
                 }`}>
                   {client.health_status.charAt(0).toUpperCase() + client.health_status.slice(1)}
                   <span className="font-bold">({client.health_score})</span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500 mb-2">Daily Digest</dt>
+                <dd>
+                  <button
+                    onClick={toggleDigest}
+                    disabled={digestToggling}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                      client.digest_enabled ? 'bg-indigo-600' : 'bg-gray-200'
+                    } ${digestToggling ? 'opacity-50 cursor-wait' : ''}`}
+                    role="switch"
+                    aria-checked={client.digest_enabled}
+                    aria-label="Include in daily digest"
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        client.digest_enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  <span className="ml-3 text-sm text-gray-600">
+                    {client.digest_enabled ? 'Included in daily digest' : 'Not included in digest'}
+                  </span>
                 </dd>
               </div>
             </dl>

@@ -1,10 +1,16 @@
 import { Hono } from 'hono';
 import { setCookie, deleteCookie } from 'hono/cookie';
 import { z } from 'zod';
-import { generateToken, generateId } from '../utils/crypto';
+import { generateToken, generateId, sha256 } from '../utils/crypto';
+import { isValidHttpsUrl } from '../utils/validation';
 import type { AppEnv } from '../index';
 
 const auth = new Hono<AppEnv>();
+
+// Absolute session timeout (30 days) - cannot be extended
+const ABSOLUTE_SESSION_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000;
+// Sliding session timeout (7 days) - can be extended up to absolute timeout
+const SESSION_TIMEOUT_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ═══════════════════════════════════════════════════════════
 // Validation Schemas
@@ -32,6 +38,35 @@ auth.post('/magic-link', async (c) => {
 
   const { email } = parsed.data;
 
+  // Per-email rate limiting (3 requests per hour per email address)
+  // This is in addition to IP-based rate limiting in middleware
+  const emailRateKey = `magic_email:${email}`;
+  const emailRateData = await c.env.CACHE.get(emailRateKey, 'json') as { count: number; resetAt: number } | null;
+  const now = Date.now();
+  const hourWindow = 60 * 60 * 1000;
+
+  if (emailRateData && emailRateData.resetAt > now) {
+    if (emailRateData.count >= 3) {
+      // Don't reveal whether email exists - return same success message
+      // but don't actually send another email
+      console.log(`[Auth] Per-email rate limit exceeded for ${email}`);
+      return c.json({
+        message: 'If an account exists with that email, we sent a sign-in link.'
+      });
+    }
+    // Increment count
+    await c.env.CACHE.put(emailRateKey, JSON.stringify({
+      count: emailRateData.count + 1,
+      resetAt: emailRateData.resetAt
+    }), { expirationTtl: Math.ceil((emailRateData.resetAt - now) / 1000) });
+  } else {
+    // Start new window
+    await c.env.CACHE.put(emailRateKey, JSON.stringify({
+      count: 1,
+      resetAt: now + hourWindow
+    }), { expirationTtl: 3660 }); // hour + 1 minute buffer
+  }
+
   // Find or create user
   let user = await c.env.DB.prepare(
     'SELECT * FROM users WHERE email = ?'
@@ -51,15 +86,28 @@ auth.post('/magic-link', async (c) => {
 
   // Generate magic link token (expires in 15 minutes)
   const token = generateToken(32);
+  const tokenHash = await sha256(token);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
   await c.env.DB.prepare(`
-    INSERT INTO auth_tokens (id, user_id, token, type, expires_at)
-    VALUES (?, ?, ?, 'magic_link', ?)
-  `).bind(generateId(), user!.id, token, expiresAt.toISOString()).run();
+    INSERT INTO auth_tokens (id, user_id, token, token_hash, type, expires_at)
+    VALUES (?, ?, ?, ?, 'magic_link', ?)
+  `).bind(generateId(), user!.id, token, tokenHash, expiresAt.toISOString()).run();
+
+  // Validate APP_URL before using in email links to prevent phishing
+  // In dev, allow localhost; in production require HTTPS
+  const appUrl = c.env.APP_URL;
+  const isValidUrl = c.env.ENVIRONMENT === 'development'
+    ? appUrl.startsWith('http://localhost') || isValidHttpsUrl(appUrl)
+    : isValidHttpsUrl(appUrl);
+
+  if (!isValidUrl) {
+    console.error('[Auth] Invalid APP_URL configuration:', appUrl);
+    return c.json({ error: 'Configuration error' }, 500);
+  }
 
   // Build magic link URL
-  const magicLinkUrl = `${c.env.APP_URL}/api/auth/verify?token=${token}`;
+  const magicLinkUrl = `${appUrl}/api/auth/verify?token=${token}`;
 
   // In development, log the link
   if (c.env.ENVIRONMENT === 'development') {
@@ -131,14 +179,28 @@ auth.get('/verify', async (c) => {
     return c.redirect(`${c.env.APP_URL}/login?error=missing_token`);
   }
 
-  // Find valid magic link token
-  const authToken = await c.env.DB.prepare(`
+  // Hash the incoming token to look up in database
+  const tokenHash = await sha256(token);
+
+  // Find valid magic link token by hash (with fallback to plain token for migration)
+  let authToken = await c.env.DB.prepare(`
     SELECT * FROM auth_tokens
-    WHERE token = ?
+    WHERE token_hash = ?
       AND type = 'magic_link'
       AND expires_at > datetime('now')
       AND used_at IS NULL
-  `).bind(token).first();
+  `).bind(tokenHash).first();
+
+  // Fallback for tokens created before migration
+  if (!authToken) {
+    authToken = await c.env.DB.prepare(`
+      SELECT * FROM auth_tokens
+      WHERE token = ?
+        AND type = 'magic_link'
+        AND expires_at > datetime('now')
+        AND used_at IS NULL
+    `).bind(token).first();
+  }
 
   if (!authToken) {
     if (returnToken) {
@@ -152,14 +214,23 @@ auth.get('/verify', async (c) => {
     UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?
   `).bind(authToken.id).run();
 
-  // Create session token (expires in 7 days)
+  // Create session token with absolute timeout
   const sessionToken = generateToken(32);
-  const sessionExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const sessionTokenHash = await sha256(sessionToken);
+  const sessionExpires = new Date(Date.now() + SESSION_TIMEOUT_MS);
+  const absoluteExpires = new Date(Date.now() + ABSOLUTE_SESSION_TIMEOUT_MS);
 
   await c.env.DB.prepare(`
-    INSERT INTO auth_tokens (id, user_id, token, type, expires_at)
-    VALUES (?, ?, ?, 'session', ?)
-  `).bind(generateId(), authToken.user_id, sessionToken, sessionExpires.toISOString()).run();
+    INSERT INTO auth_tokens (id, user_id, token, token_hash, type, expires_at, absolute_expires_at)
+    VALUES (?, ?, ?, ?, 'session', ?, ?)
+  `).bind(
+    generateId(),
+    authToken.user_id,
+    sessionToken, // Keep plain token temporarily for backward compatibility during migration
+    sessionTokenHash,
+    sessionExpires.toISOString(),
+    absoluteExpires.toISOString()
+  ).run();
 
   // Update user's last login
   await c.env.DB.prepare(`
@@ -171,11 +242,11 @@ auth.get('/verify', async (c) => {
     return c.json({ sessionToken, success: true });
   }
 
-  // Legacy mode: Set cookie and redirect (for direct API access)
+  // Set secure cookie with proper SameSite setting
   setCookie(c, 'session', sessionToken, {
     httpOnly: true,
     secure: true,
-    sameSite: 'None',
+    sameSite: 'Lax', // Changed from 'None' for CSRF protection
     path: '/',
     maxAge: 7 * 24 * 60 * 60
   });
@@ -238,6 +309,52 @@ auth.get('/me', async (c) => {
   `).bind(sessionToken).first();
 
   return c.json({ user: user || null });
+});
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/auth/exchange - Exchange one-time code for session
+// Used by OAuth flow to avoid session token in URL
+// ═══════════════════════════════════════════════════════════
+
+auth.post('/exchange', async (c) => {
+  const body = await c.req.json();
+  const code = body.code;
+
+  if (!code || typeof code !== 'string') {
+    return c.json({ error: 'Missing code' }, 400);
+  }
+
+  // Find and validate exchange code
+  const exchangeRecord = await c.env.DB.prepare(`
+    SELECT * FROM exchange_codes
+    WHERE code = ?
+      AND expires_at > datetime('now')
+      AND used_at IS NULL
+  `).bind(code).first();
+
+  if (!exchangeRecord) {
+    return c.json({ error: 'Invalid or expired code' }, 400);
+  }
+
+  // Mark code as used
+  await c.env.DB.prepare(`
+    UPDATE exchange_codes SET used_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).bind(exchangeRecord.id).run();
+
+  // Find the session by its hash
+  const session = await c.env.DB.prepare(`
+    SELECT token FROM auth_tokens
+    WHERE token_hash = ?
+      AND type = 'session'
+      AND expires_at > datetime('now')
+      AND used_at IS NULL
+  `).bind(exchangeRecord.session_token_hash).first<{ token: string }>();
+
+  if (!session) {
+    return c.json({ error: 'Session expired' }, 400);
+  }
+
+  return c.json({ sessionToken: session.token, success: true });
 });
 
 export default auth;
