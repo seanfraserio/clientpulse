@@ -11,10 +11,16 @@ export const onRequest: PagesFunction = async (context) => {
   const url = new URL(request.url);
   const targetUrl = `${API_URL}/api/${path}${url.search}`;
 
+  // Create new headers, explicitly copying all headers including cookies
+  const headers = new Headers();
+  for (const [key, value] of request.headers.entries()) {
+    headers.set(key, value);
+  }
+
   // Create a new request with the same method, headers, and body
   const proxyRequest = new Request(targetUrl, {
     method: request.method,
-    headers: request.headers,
+    headers: headers,
     body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
     redirect: 'manual', // Don't follow redirects automatically
   });
