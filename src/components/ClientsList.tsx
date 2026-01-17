@@ -88,7 +88,7 @@ export default function ClientsList() {
           <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
           <p className="text-gray-500 mt-1">{clients.length} total clients</p>
         </div>
-        <a href="/clients/new" className="btn-primary">
+        <a href="/clients/new/" className="btn-primary">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -141,7 +141,7 @@ export default function ClientsList() {
               </div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">No clients yet</h2>
               <p className="text-gray-600 mb-6">Add your first client to start tracking relationships</p>
-              <a href="/clients/new" className="btn-primary">Add Client</a>
+              <a href="/clients/new/" className="btn-primary">Add Client</a>
             </>
           ) : (
             <>

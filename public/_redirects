@@ -1,3 +1,2 @@
-# SPA fallback for dynamic client routes
-/clients/:id  /clients/index.html  200
-/clients/:id/*  /clients/index.html  200
+# Handle trailing slashes - redirect non-trailing to trailing for static pages
+/clients/new /clients/new/ 301

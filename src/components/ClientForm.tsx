@@ -61,7 +61,12 @@ export default function ClientForm({ clientId, initialData }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!validate()) return;
+    console.log('[ClientForm] Submit triggered');
+
+    if (!validate()) {
+      console.log('[ClientForm] Validation failed');
+      return;
+    }
 
     setLoading(true);
     setGlobalError(null);
@@ -85,13 +90,18 @@ export default function ClientForm({ clientId, initialData }: Props) {
       const url = isEditing ? `/api/clients/${clientId}` : '/api/clients';
       const method = isEditing ? 'PUT' : 'POST';
 
+      console.log('[ClientForm] Sending request:', method, url, payload);
+
       const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
+      console.log('[ClientForm] Response status:', res.status);
+
       const data = await res.json();
+      console.log('[ClientForm] Response data:', data);
 
       if (!res.ok) {
         if (data.details) {
@@ -101,6 +111,7 @@ export default function ClientForm({ clientId, initialData }: Props) {
             fieldErrors[field] = d.message;
           });
           setErrors(fieldErrors);
+          console.log('[ClientForm] Validation errors from server:', fieldErrors);
         } else {
           throw new Error(data.error || 'Failed to save client');
         }
@@ -108,8 +119,10 @@ export default function ClientForm({ clientId, initialData }: Props) {
       }
 
       // Success - redirect to client page
+      console.log('[ClientForm] Success, redirecting to:', `/clients/${data.data.id}`);
       window.location.href = `/clients/${data.data.id}`;
     } catch (err) {
+      console.error('[ClientForm] Error:', err);
       setGlobalError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);

@@ -6,6 +6,7 @@ import cloudflare from '@astrojs/cloudflare';
 // https://astro.build/config
 export default defineConfig({
   site: 'https://clientpulse.app',
+  trailingSlash: 'ignore',
   integrations: [
     react(),
     tailwind()
@@ -15,8 +16,9 @@ export default defineConfig({
     mode: 'directory',
     routes: {
       strategy: 'include',
-      include: ['/clients/*', '/clients/*/edit'],
-      exclude: ['/api/*']
+      // Only dynamic routes need SSR - static pages like /clients/new are prerendered
+      include: ['/clients/*/edit'],
+      exclude: ['/api/*', '/clients/new']
     }
   }),
   build: {

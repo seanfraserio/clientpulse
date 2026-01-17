@@ -111,7 +111,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-gray-900">Relationship Radar</h1>
           <p className="text-gray-500 mt-1">Your client relationships at a glance</p>
         </div>
-        <a href="/clients/new" className="btn-primary">
+        <a href="/clients/new/" className="btn-primary">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -132,7 +132,7 @@ export default function Dashboard() {
             Start by adding your first client. You'll be able to track notes,
             commitments, and relationship health all in one place.
           </p>
-          <a href="/clients/new" className="btn-primary btn-lg">
+          <a href="/clients/new/" className="btn-primary btn-lg">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>

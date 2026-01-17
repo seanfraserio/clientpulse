@@ -1,6 +1,9 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import ClientForm from '../../components/ClientForm';
+
+// Explicitly prerender as static page
+export const prerender = true;
 ---
 
 <Layout title="Add Client" requireAuth={true}>

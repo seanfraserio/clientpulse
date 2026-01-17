@@ -12,10 +12,11 @@ const clients = new Hono<AppEnv>();
 
 const CreateClientSchema = z.object({
   name: z.string().min(1).max(200).trim(),
-  company: z.string().max(200).trim().optional(),
-  email: z.string().email().max(255).toLowerCase().optional(),
-  phone: z.string().max(50).optional(),
-  role: z.string().max(100).optional(),
+  company: z.string().max(200).trim().nullish(),
+  email: z.string().email().max(255).toLowerCase().nullish(),
+  phone: z.string().max(50).nullish(),
+  role: z.string().max(100).nullish(),
+  notes: z.string().nullish(), // Initial notes field from form
   tags: z.array(z.string().max(50)).max(20).optional()
 });
 
@@ -54,38 +55,52 @@ clients.get('/', async (c) => {
 // ═══════════════════════════════════════════════════════════
 
 clients.post('/', async (c) => {
-  const db = c.get('db') as TenantDB;
-  const user = c.get('user') as User;
-  const body = await c.req.json();
+  try {
+    const db = c.get('db') as TenantDB;
+    const user = c.get('user') as User;
+    const body = await c.req.json();
 
-  // Validate input
-  const parsed = CreateClientSchema.safeParse(body);
-  if (!parsed.success) {
+    console.log('[Clients] Creating client, body:', JSON.stringify(body));
+
+    // Validate input
+    const parsed = CreateClientSchema.safeParse(body);
+    if (!parsed.success) {
+      console.log('[Clients] Validation failed:', JSON.stringify(parsed.error.errors));
+      return c.json({
+        error: 'Validation failed',
+        details: parsed.error.errors.map(e => ({
+          path: e.path.join('.'),
+          message: e.message
+        }))
+      }, 400);
+    }
+
+    // Check client limit
+    const { getTierByPlan } = await import('@shared/billing');
+    const tier = getTierByPlan(user.plan);
+    const currentCount = await db.getClientCount();
+
+    console.log('[Clients] User plan:', user.plan, 'Current count:', currentCount, 'Limit:', tier.limits.maxClients);
+
+    if (currentCount >= tier.limits.maxClients) {
+      return c.json({
+        error: 'Client limit reached',
+        limit: tier.limits.maxClients,
+        upgrade_url: '/settings/billing'
+      }, 403);
+    }
+
+    const client = await db.createClient(parsed.data);
+    console.log('[Clients] Created client:', client.id);
+
+    return c.json({ data: client }, 201);
+  } catch (error) {
+    console.error('[Clients] Error creating client:', error);
     return c.json({
-      error: 'Validation failed',
-      details: parsed.error.errors.map(e => ({
-        path: e.path.join('.'),
-        message: e.message
-      }))
-    }, 400);
+      error: 'Failed to create client',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    }, 500);
   }
-
-  // Check client limit
-  const { getTierByPlan } = await import('@shared/billing');
-  const tier = getTierByPlan(user.plan);
-  const currentCount = await db.getClientCount();
-
-  if (currentCount >= tier.limits.maxClients) {
-    return c.json({
-      error: 'Client limit reached',
-      limit: tier.limits.maxClients,
-      upgrade_url: '/settings/billing'
-    }, 403);
-  }
-
-  const client = await db.createClient(parsed.data);
-
-  return c.json({ data: client }, 201);
 });
 
 // ═══════════════════════════════════════════════════════════
