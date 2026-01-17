@@ -1,2 +1,3 @@
 # Handle trailing slashes - redirect non-trailing to trailing for static pages
 /clients/new /clients/new/ 301
+/notes/new /notes/new/ 301

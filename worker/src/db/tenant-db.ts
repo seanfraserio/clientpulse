@@ -185,20 +185,25 @@ export class TenantDB {
   } = {}): Promise<Note[]> {
     const { clientId, limit = 50, cursor } = options;
 
-    let query = `SELECT * FROM notes WHERE user_id = ?`;
+    let query = `
+      SELECT n.*, c.name as client_name
+      FROM notes n
+      JOIN clients c ON c.id = n.client_id
+      WHERE n.user_id = ?
+    `;
     const params: (string | number)[] = [this.userId];
 
     if (clientId) {
-      query += ` AND client_id = ?`;
+      query += ` AND n.client_id = ?`;
       params.push(clientId);
     }
 
     if (cursor) {
-      query += ` AND created_at < ?`;
+      query += ` AND n.created_at < ?`;
       params.push(cursor);
     }
 
-    query += ` ORDER BY created_at DESC LIMIT ?`;
+    query += ` ORDER BY n.created_at DESC LIMIT ?`;
     params.push(limit);
 
     const result = await this.db.prepare(query).bind(...params).all();

@@ -17,8 +17,8 @@ export default defineConfig({
     routes: {
       strategy: 'include',
       // Only dynamic routes need SSR - static pages like /clients/new are prerendered
-      include: ['/clients/*/edit'],
-      exclude: ['/api/*', '/clients/new']
+      include: ['/clients/*/edit', '/notes/*'],
+      exclude: ['/api/*', '/clients/new', '/notes/new']
     }
   }),
   build: {

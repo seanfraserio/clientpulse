@@ -13,19 +13,20 @@ const notes = new Hono<AppEnv>();
 const CreateNoteSchema = z.object({
   clientId: z.string().regex(/^[a-f0-9]{32}$/),
   noteType: z.enum(['meeting', 'quick', 'email', 'call']).default('meeting'),
-  title: z.string().max(200).trim().optional(),
-  meetingDate: z.string().datetime().optional(),
-  meetingType: z.enum(['video_call', 'phone', 'in_person', 'async']).optional(),
-  durationMinutes: z.number().int().min(1).max(600).optional(),
+  title: z.string().max(200).trim().nullish(),
+  // Accept YYYY-MM-DD date format from HTML date input
+  meetingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  meetingType: z.enum(['meeting', 'call', 'email', 'chat', 'video_call', 'phone', 'in_person', 'async', 'other']).nullish(),
+  durationMinutes: z.number().int().min(1).max(600).nullish(),
   attendees: z.array(z.string().max(100)).max(20).optional(),
-  summary: z.string().max(1000).trim().optional(),
-  discussed: z.string().max(5000).trim().optional(),
-  decisions: z.string().max(2000).trim().optional(),
-  actionItemsRaw: z.string().max(2000).trim().optional(),
-  concerns: z.string().max(2000).trim().optional(),
-  personalNotes: z.string().max(2000).trim().optional(),
-  nextSteps: z.string().max(2000).trim().optional(),
-  mood: z.enum(['positive', 'neutral', 'negative']).default('neutral')
+  summary: z.string().max(1000).trim().nullish(),
+  discussed: z.string().max(5000).trim().nullish(),
+  decisions: z.string().max(2000).trim().nullish(),
+  actionItemsRaw: z.string().max(2000).trim().nullish(),
+  concerns: z.string().max(2000).trim().nullish(),
+  personalNotes: z.string().max(2000).trim().nullish(),
+  nextSteps: z.string().max(2000).trim().nullish(),
+  mood: z.enum(['positive', 'neutral', 'negative', 'concerned', 'frustrated']).default('neutral')
 });
 
 const UpdateNoteSchema = CreateNoteSchema.partial().omit({ clientId: true });

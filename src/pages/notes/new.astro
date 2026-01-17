@@ -2,6 +2,9 @@
 import Layout from '../../layouts/Layout.astro';
 import NoteForm from '../../components/NoteForm';
 
+// Explicitly prerender as static page
+export const prerender = true;
+
 const clientId = Astro.url.searchParams.get('clientId');
 ---
 
