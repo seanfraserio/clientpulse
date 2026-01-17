@@ -233,18 +233,124 @@ export default function ClientDetail({ clientId }: Props) {
 
       {activeTab === 'details' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Contact Information */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Contact Information
+            </h3>
+            <dl className="space-y-4">
+              {client.company && (
+                <div>
+                  <dt className="text-sm text-gray-500">Company</dt>
+                  <dd className="text-gray-900 font-medium">{client.company}</dd>
+                </div>
+              )}
+              {client.role && (
+                <div>
+                  <dt className="text-sm text-gray-500">Role / Title</dt>
+                  <dd className="text-gray-900">{client.role}</dd>
+                </div>
+              )}
+              {client.email && (
+                <div>
+                  <dt className="text-sm text-gray-500">Email</dt>
+                  <dd>
+                    <a href={`mailto:${client.email}`} className="text-indigo-600 hover:text-indigo-700">
+                      {client.email}
+                    </a>
+                  </dd>
+                </div>
+              )}
+              {client.phone && (
+                <div>
+                  <dt className="text-sm text-gray-500">Phone</dt>
+                  <dd>
+                    <a href={`tel:${client.phone}`} className="text-indigo-600 hover:text-indigo-700">
+                      {client.phone}
+                    </a>
+                  </dd>
+                </div>
+              )}
+              {!client.company && !client.role && !client.email && !client.phone && (
+                <p className="text-gray-400 text-sm italic">No contact information added</p>
+              )}
+            </dl>
+          </div>
+
+          {/* Client Information */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Client Information
+            </h3>
+            <dl className="space-y-4">
+              <div>
+                <dt className="text-sm text-gray-500">Client since</dt>
+                <dd className="text-gray-900">{new Date(client.created_at).toLocaleDateString()}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Last contact</dt>
+                <dd className="text-gray-900">
+                  {client.last_contact_at
+                    ? new Date(client.last_contact_at).toLocaleDateString()
+                    : 'Never'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-gray-500">Health Status</dt>
+                <dd className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-sm font-medium ${
+                  client.health_status === 'healthy' ? 'bg-green-100 text-green-700' :
+                  client.health_status === 'watch' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {client.health_status.charAt(0).toUpperCase() + client.health_status.slice(1)}
+                  <span className="font-bold">({client.health_score})</span>
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* Tags */}
+          {client.tags.length > 0 && (
+            <div className="card p-6">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Tags
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {client.tags.map(tag => (
+                  <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Notes */}
           {client.notes && (
-            <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">Notes</h3>
+            <div className="card p-6 lg:col-span-2">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Notes
+              </h3>
               <p className="text-gray-600 whitespace-pre-wrap">{client.notes}</p>
             </div>
           )}
 
           {/* AI Personal Details */}
           {client.ai_personal_details.length > 0 && (
-            <div className="card p-6">
-              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <div className="card p-6 lg:col-span-2">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
@@ -261,25 +367,6 @@ export default function ClientDetail({ clientId }: Props) {
               </ul>
             </div>
           )}
-
-          {/* Client Since */}
-          <div className="card p-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Client Information</h3>
-            <dl className="space-y-3">
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Client since</dt>
-                <dd className="text-gray-900">{new Date(client.created_at).toLocaleDateString()}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Last contact</dt>
-                <dd className="text-gray-900">
-                  {client.last_contact_at
-                    ? new Date(client.last_contact_at).toLocaleDateString()
-                    : 'Never'}
-                </dd>
-              </div>
-            </dl>
-          </div>
         </div>
       )}
     </div>

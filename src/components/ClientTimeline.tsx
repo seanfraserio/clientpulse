@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../lib/api';
 
 interface TimelineEntry {
   id: string;
@@ -24,10 +25,26 @@ export default function ClientTimeline({ clientId }: Props) {
 
   async function fetchTimeline() {
     try {
-      const res = await fetch(`/api/clients/${clientId}/timeline`, { credentials: 'include' });
+      const res = await apiFetch(`/api/clients/${clientId}/timeline`);
       if (!res.ok) throw new Error('Failed to load timeline');
       const json = await res.json();
-      setEntries(json.data);
+
+      // Transform notes into timeline entries
+      const notes = json.data.timeline || [];
+      const timelineEntries: TimelineEntry[] = notes.map((note: Record<string, unknown>) => ({
+        id: note.id as string,
+        type: 'note' as const,
+        title: (note.title as string) || `${note.note_type} note`,
+        description: note.summary as string | null,
+        metadata: {
+          ai_summary: note.ai_summary,
+          note_type: note.note_type,
+          mood: note.mood
+        },
+        created_at: note.created_at as string
+      }));
+
+      setEntries(timelineEntries);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
