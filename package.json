@@ -1,0 +1,42 @@
+{
+  "name": "clientpulse",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "dev:all": "./scripts/dev.sh",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "typecheck": "astro check && tsc --noEmit",
+    "setup": "./scripts/setup.sh",
+    "deploy": "./scripts/deploy.sh",
+    "deploy:worker": "./scripts/deploy-worker.sh",
+    "deploy:frontend": "./scripts/deploy-frontend.sh",
+    "migrate": "./scripts/migrate.sh local",
+    "migrate:prod": "./scripts/migrate.sh remote",
+    "worker:dev": "cd worker && npm run dev",
+    "worker:deploy": "cd worker && npm run deploy",
+    "worker:logs": "cd worker && wrangler tail"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/react": "^3.6.0",
+    "@astrojs/tailwind": "^5.1.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "astro": "^4.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "@tailwindcss/typography": "^0.5.14",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.41"
+  }
+}

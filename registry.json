@@ -1,0 +1,68 @@
+{
+  "version": "1.0.0",
+  "project": "clientpulse",
+  "description": "Agent framework for the ClientPulse project",
+  "agents": {
+    "core": {
+      "architect": {
+        "path": "agents/core/architect.md",
+        "description": "System design and architecture decisions",
+        "triggers": ["design", "structure", "plan", "architecture", "system", "api"]
+      },
+      "engineer": {
+        "path": "agents/core/engineer.md",
+        "description": "Code implementation and debugging",
+        "triggers": ["build", "implement", "create", "code", "fix", "debug", "refactor"]
+      },
+      "reviewer": {
+        "path": "agents/core/reviewer.md",
+        "description": "Code review and quality assurance",
+        "triggers": ["review", "check", "audit", "test", "verify", "validate"]
+      },
+      "content": {
+        "path": "agents/core/content.md",
+        "description": "Documentation and content creation",
+        "triggers": ["blog", "post", "article", "docs", "documentation", "guide", "write"]
+      }
+    },
+    "specialized": {
+      "_placeholder": {
+        "path": "agents/specialized/example.md",
+        "description": "Add specialized agents here for domain-specific tasks"
+      }
+    }
+  },
+  "commands": {
+    "build": {
+      "path": "commands/build.md",
+      "description": "Build and compile the project"
+    },
+    "deploy": {
+      "path": "commands/deploy.md",
+      "description": "Deploy to target environment"
+    },
+    "test": {
+      "path": "commands/test.md",
+      "description": "Run test suites"
+    }
+  },
+  "workflows": {
+    "new-feature": {
+      "description": "Full workflow for new feature development",
+      "agents": ["architect", "engineer", "reviewer", "content"]
+    },
+    "bug-fix": {
+      "description": "Workflow for fixing bugs",
+      "agents": ["engineer", "reviewer"]
+    },
+    "documentation": {
+      "description": "Workflow for creating documentation",
+      "agents": ["content", "reviewer"]
+    }
+  },
+  "settings": {
+    "defaultAgent": "engineer",
+    "requireConfirmation": false,
+    "verboseRouting": true
+  }
+}

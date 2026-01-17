@@ -1,0 +1,86 @@
+# ClientPulse API Worker
+name = "clientpulse-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ═══════════════════════════════════════════════════════════
+# D1 Database
+# ═══════════════════════════════════════════════════════════
+[[d1_databases]]
+binding = "DB"
+database_name = "clientpulse"
+database_id = "84765618-dbc6-4e28-88c2-0b635e8c4cda"  # Replace after: wrangler d1 create clientpulse
+
+# ═══════════════════════════════════════════════════════════
+# R2 Storage (for future file attachments)
+# ═══════════════════════════════════════════════════════════
+# [[r2_buckets]]
+# binding = "FILES"
+# bucket_name = "clientpulse-files"
+
+# ═══════════════════════════════════════════════════════════
+# KV Namespace (for rate limiting and caching)
+# ═══════════════════════════════════════════════════════════
+[[kv_namespaces]]
+binding = "CACHE"
+id = "2f61a35c86974eef8eb76cbbb0cbf56f"
+
+# ═══════════════════════════════════════════════════════════
+# Queues (for async AI processing)
+# ═══════════════════════════════════════════════════════════
+[[queues.producers]]
+queue = "ai-processing-queue"
+binding = "AI_QUEUE"
+
+[[queues.consumers]]
+queue = "ai-processing-queue"
+max_batch_size = 10
+max_batch_timeout = 30
+
+# ═══════════════════════════════════════════════════════════
+# Vectorize Index (for semantic search)
+# ═══════════════════════════════════════════════════════════
+# [[vectorize]]
+# binding = "NOTES_INDEX"
+# index_name = "clientpulse-notes"
+
+# ═══════════════════════════════════════════════════════════
+# Workers AI
+# ═══════════════════════════════════════════════════════════
+[ai]
+binding = "AI"
+
+# ═══════════════════════════════════════════════════════════
+# Environment Variables
+# ═══════════════════════════════════════════════════════════
+[vars]
+ENVIRONMENT = "production"
+APP_URL = "https://clientpulse.pages.dev"
+API_URL = "https://clientpulse-api.sfraser.workers.dev"
+FROM_EMAIL = "ClientPulse <hello@clientpulse.app>"
+GEMINI_MODEL = "gemini-1.5-flash"
+
+# ═══════════════════════════════════════════════════════════
+# Scheduled Tasks (Cron Triggers)
+# ═══════════════════════════════════════════════════════════
+[triggers]
+crons = [
+  "0 * * * *",   # Every hour - check for daily digests to send
+  "0 3 * * *"    # 3am UTC - nightly health recalculation
+]
+
+# ═══════════════════════════════════════════════════════════
+# Secrets (set via `wrangler secret put <NAME>`)
+# ═══════════════════════════════════════════════════════════
+# SESSION_SECRET     - 32+ byte random string for signing
+# RESEND_API_KEY     - Email service API key
+# GEMINI_API_KEY     - Google Gemini API key (fallback AI)
+# STRIPE_SECRET_KEY  - Stripe secret key
+# STRIPE_WEBHOOK_SECRET - Stripe webhook signing secret
+
+# ═══════════════════════════════════════════════════════════
+# Production Overrides
+# ═══════════════════════════════════════════════════════════
+[env.production]
+vars = { ENVIRONMENT = "production", APP_URL = "https://clientpulse.app", API_URL = "https://api.clientpulse.app" }

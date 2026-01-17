@@ -1,0 +1,131 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+// This page handles both:
+// 1. Magic link verification (token param)
+// 2. OAuth session setup (session param)
+// URL params are read client-side since this is a static site
+---
+
+<Layout title="Verifying..." showNav={false}>
+  <div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-indigo-50 via-white to-white px-4">
+    <div class="w-full max-w-md text-center">
+      <!-- Logo -->
+      <a href="/" class="inline-flex items-center gap-2 mb-8">
+        <div class="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <span class="text-2xl font-bold text-gray-900">ClientPulse</span>
+      </a>
+
+      <div class="card p-8">
+        <div id="verifying-state">
+          <div class="spinner-lg mx-auto mb-4"></div>
+          <h1 class="text-xl font-semibold text-gray-900 mb-2">Verifying your link...</h1>
+          <p class="text-gray-600">Please wait while we sign you in.</p>
+        </div>
+
+        <div id="success-state" class="hidden">
+          <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 class="text-xl font-semibold text-gray-900 mb-2">You're signed in!</h1>
+          <p class="text-gray-600">Redirecting to your dashboard...</p>
+        </div>
+
+        <div id="error-state" class="hidden">
+          <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h1 class="text-xl font-semibold text-gray-900 mb-2">Link expired or invalid</h1>
+          <p class="text-gray-600 mb-4" id="error-message">This magic link has expired or already been used.</p>
+          <a href="/login" class="btn-primary">
+            Request a new link
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  function setCookie(name, value, days) {
+    const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+    // Set cookie with secure flags for same-site requests through proxy
+    document.cookie = `${name}=${value}; expires=${expires}; path=/; secure; samesite=lax`;
+  }
+
+  async function handleAuth() {
+    const verifyingEl = document.getElementById('verifying-state');
+    const successEl = document.getElementById('success-state');
+    const errorEl = document.getElementById('error-state');
+    const errorMsgEl = document.getElementById('error-message');
+
+    // Read URL params client-side (since this is a static site)
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionToken = urlParams.get('session');
+    const token = urlParams.get('token');
+
+    // Case 1: OAuth callback with session token
+    if (sessionToken) {
+      // Set the session cookie on this domain
+      setCookie('session', sessionToken, 7);
+
+      // Show success and redirect
+      verifyingEl?.classList.add('hidden');
+      successEl?.classList.remove('hidden');
+
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1000);
+      return;
+    }
+
+    // Case 2: Magic link verification
+    if (!token) {
+      verifyingEl?.classList.add('hidden');
+      errorEl?.classList.remove('hidden');
+      if (errorMsgEl) errorMsgEl.textContent = 'No verification token provided.';
+      return;
+    }
+
+    try {
+      // Call the API to verify magic link and get session token
+      const API_URL = 'https://clientpulse-api.sfraser.workers.dev';
+      const res = await fetch(`${API_URL}/api/auth/verify?token=${encodeURIComponent(token)}&returnToken=true`);
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Verification failed');
+      }
+
+      // If we got a session token, set the cookie
+      if (data.sessionToken) {
+        setCookie('session', data.sessionToken, 7);
+      }
+
+      // Success - show success state and redirect
+      verifyingEl?.classList.add('hidden');
+      successEl?.classList.remove('hidden');
+
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 1500);
+    } catch (err) {
+      verifyingEl?.classList.add('hidden');
+      errorEl?.classList.remove('hidden');
+      if (errorMsgEl && err instanceof Error) {
+        errorMsgEl.textContent = err.message;
+      }
+    }
+  }
+
+  handleAuth();
+</script>

@@ -1,0 +1,3 @@
+# SPA fallback for dynamic client routes
+/clients/:id  /clients/index.html  200
+/clients/:id/*  /clients/index.html  200

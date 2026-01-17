@@ -1,0 +1,27 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import SettingsNotifications from '../../components/SettingsNotifications';
+---
+
+<Layout title="Notifications" requireAuth={true}>
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-8">Settings</h1>
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-gray-200 mb-8">
+      <nav class="flex gap-6">
+        <a href="/settings" class="pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+          Profile
+        </a>
+        <a href="/settings/billing" class="pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+          Billing
+        </a>
+        <a href="/settings/notifications" class="pb-3 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600">
+          Notifications
+        </a>
+      </nav>
+    </div>
+
+    <SettingsNotifications client:load />
+  </div>
+</Layout>

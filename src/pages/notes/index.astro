@@ -1,0 +1,8 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import NotesList from '../../components/NotesList';
+---
+
+<Layout title="Notes" requireAuth={true}>
+  <NotesList client:load />
+</Layout>

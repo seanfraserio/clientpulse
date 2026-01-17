@@ -1,0 +1,29 @@
+{
+  "name": "clientpulse-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "dev:remote": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "tail": "wrangler tail",
+    "typecheck": "tsc --noEmit",
+    "db:local": "wrangler d1 execute clientpulse-db --local --file=src/db/schema.sql",
+    "db:remote": "wrangler d1 execute clientpulse-db --remote --file=src/db/schema.sql",
+    "secrets:list": "wrangler secret list",
+    "queue:status": "wrangler queues list"
+  },
+  "dependencies": {
+    "hono": "^4.5.0",
+    "zod": "^3.23.8",
+    "@google/generative-ai": "^0.19.0",
+    "stripe": "^16.12.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240815.0",
+    "typescript": "^5.5.4",
+    "wrangler": "^3.72.0"
+  }
+}

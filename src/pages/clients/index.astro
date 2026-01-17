@@ -1,0 +1,8 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ClientsList from '../../components/ClientsList';
+---
+
+<Layout title="Clients" requireAuth={true}>
+  <ClientsList client:load />
+</Layout>

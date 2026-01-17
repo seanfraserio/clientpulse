@@ -1,0 +1,82 @@
+---
+import Layout from '../layouts/Layout.astro';
+import OAuthButtons from '../components/OAuthButtons';
+import MagicLinkForm from '../components/MagicLinkForm';
+
+// Get error from URL params for OAuth error display
+const url = new URL(Astro.request.url);
+const error = url.searchParams.get('error');
+
+// Map error codes to user-friendly messages
+const errorMessages: Record<string, string> = {
+  oauth_denied: 'You cancelled the sign-in process. Please try again.',
+  oauth_invalid: 'Invalid OAuth request. Please try again.',
+  oauth_state_invalid: 'Your session expired. Please try again.',
+  oauth_token_failed: 'Failed to authenticate. Please try again.',
+  oauth_user_failed: 'Failed to get user info. Please try again.',
+  oauth_no_email: 'No email address found. Please use an account with a verified email.',
+  oauth_failed: 'Something went wrong. Please try again.',
+  missing_token: 'Invalid sign-in link. Please request a new one.',
+  invalid_token: 'This sign-in link has expired. Please request a new one.',
+};
+
+const errorMessage = error ? errorMessages[error] || 'An error occurred. Please try again.' : null;
+---
+
+<Layout title="Sign In" showNav={false}>
+  <div class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-indigo-50 via-white to-white px-4">
+    <div class="w-full max-w-md">
+      <!-- Logo -->
+      <a href="/" class="flex items-center justify-center gap-2 mb-8">
+        <div class="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <span class="text-2xl font-bold text-gray-900">ClientPulse</span>
+      </a>
+
+      <!-- Sign In Card -->
+      <div class="card p-8">
+        <div class="text-center mb-6">
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">Welcome back</h1>
+          <p class="text-gray-600">Sign in to your account</p>
+        </div>
+
+        {/* Error message display */}
+        {errorMessage && (
+          <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p class="text-sm text-red-700">{errorMessage}</p>
+          </div>
+        )}
+
+        {/* OAuth Buttons */}
+        <OAuthButtons client:load />
+
+        {/* Divider */}
+        <div class="relative my-6">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-gray-200"></div>
+          </div>
+          <div class="relative flex justify-center text-sm">
+            <span class="px-4 bg-white text-gray-500">or continue with email</span>
+          </div>
+        </div>
+
+        <MagicLinkForm client:load />
+
+        <div class="mt-6 text-center text-sm text-gray-500">
+          <p>No password needed – we'll email you a secure sign-in link.</p>
+        </div>
+      </div>
+
+      <!-- Footer links -->
+      <div class="mt-6 text-center text-sm text-gray-500">
+        <p>
+          New to ClientPulse?
+          <a href="/" class="text-indigo-600 hover:text-indigo-700 font-medium"> Learn more →</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</Layout>

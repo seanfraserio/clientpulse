@@ -1,0 +1,15 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ClientDetail from '../../components/ClientDetail';
+
+export async function getStaticPaths() {
+  // Dynamic routes handled client-side - return empty for static build
+  return [];
+}
+
+const { id } = Astro.params;
+---
+
+<Layout title="Client Details" requireAuth={true}>
+  <ClientDetail client:load clientId={id} />
+</Layout>
