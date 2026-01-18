@@ -8,7 +8,8 @@ import type {
   CreateNoteInput,
   CreateActionInput,
   RadarData,
-  ClientWithStats
+  ClientWithStats,
+  OverdueAction
 } from '@shared/types';
 
 /**
@@ -306,17 +307,25 @@ export class TenantDB {
     return result.results as unknown as ActionItem[];
   }
 
-  async getOverdueActions(): Promise<ActionItem[]> {
+  async getOverdueActions(): Promise<OverdueAction[]> {
     const result = await this.db.prepare(`
-      SELECT * FROM action_items
-      WHERE user_id = ?
-        AND status = 'open'
-        AND owner = 'me'
-        AND due_date < date('now')
-      ORDER BY due_date ASC
+      SELECT
+        ai.id,
+        ai.description,
+        ai.client_id,
+        c.name as client_name,
+        ai.due_date,
+        CAST(julianday('now') - julianday(ai.due_date) AS INTEGER) as days_overdue
+      FROM action_items ai
+      JOIN clients c ON c.id = ai.client_id
+      WHERE ai.user_id = ?
+        AND ai.status = 'open'
+        AND ai.owner = 'me'
+        AND ai.due_date < date('now')
+      ORDER BY ai.due_date ASC
     `).bind(this.userId).all();
 
-    return result.results as unknown as ActionItem[];
+    return result.results as unknown as OverdueAction[];
   }
 
   async createAction(data: CreateActionInput): Promise<ActionItem> {
@@ -402,7 +411,7 @@ export class TenantDB {
       stats: {
         totalClients: clients.length,
         needsAttention: attention.length,
-        openCommitments: overdueActions.length
+        overdueActions: overdueActions.length
       }
     };
   }
@@ -427,7 +436,11 @@ export class TenantDB {
       attendees: JSON.parse(row.attendees as string || '[]'),
       ai_risk_signals: JSON.parse(row.ai_risk_signals as string || '[]'),
       ai_personal_details: JSON.parse(row.ai_personal_details as string || '[]'),
-      ai_topics: JSON.parse(row.ai_topics as string || '[]')
+      ai_topics: JSON.parse(row.ai_topics as string || '[]'),
+      ai_key_insights: JSON.parse(row.ai_key_insights as string || '[]'),
+      ai_relationship_signals: JSON.parse(row.ai_relationship_signals as string || '[]'),
+      ai_follow_up_recommendations: JSON.parse(row.ai_follow_up_recommendations as string || '[]'),
+      ai_communication_style: row.ai_communication_style as string | null
     } as Note;
   }
 }

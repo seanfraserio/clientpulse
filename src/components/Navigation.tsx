@@ -95,6 +95,19 @@ export default function Navigation({ requireAuth = false }: NavigationProps) {
 
           {/* Right side */}
           <div className="flex items-center gap-4">
+            {/* Upgrade button for free users */}
+            {user && user.plan === 'free' && (
+              <a
+                href="/settings/billing"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm hover:shadow-md"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+                Upgrade
+              </a>
+            )}
+
             {loading ? (
               <div className="spinner-sm" />
             ) : user ? (
@@ -193,6 +206,14 @@ export default function Navigation({ requireAuth = false }: NavigationProps) {
                 {link.label}
               </a>
             ))}
+            {user.plan === 'free' && (
+              <a
+                href="/settings/billing"
+                className="block mx-3 mt-3 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center font-medium rounded-lg"
+              >
+                ⚡ Upgrade to Pro
+              </a>
+            )}
           </div>
         )}
       </div>

@@ -32,6 +32,7 @@ export default function ClientForm({ clientId, initialData }: Props) {
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [loading, setLoading] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [limitReached, setLimitReached] = useState<{ limit: number; upgradeUrl: string } | null>(null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
@@ -70,6 +71,7 @@ export default function ClientForm({ clientId, initialData }: Props) {
 
     setLoading(true);
     setGlobalError(null);
+    setLimitReached(null);
 
     try {
       const tags = formData.tags
@@ -104,6 +106,13 @@ export default function ClientForm({ clientId, initialData }: Props) {
       console.log('[ClientForm] Response data:', data);
 
       if (!res.ok) {
+        // Check if it's a limit reached error
+        if (res.status === 403 && data.limit && data.upgrade_url) {
+          console.log('[ClientForm] Client limit reached:', data.limit);
+          setLimitReached({ limit: data.limit, upgradeUrl: data.upgrade_url });
+          return;
+        }
+
         if (data.details) {
           const fieldErrors: Partial<Record<keyof FormData, string>> = {};
           data.details.forEach((d: { path: string; message: string }) => {
@@ -134,6 +143,42 @@ export default function ClientForm({ clientId, initialData }: Props) {
       {globalError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
           {globalError}
+        </div>
+      )}
+
+      {limitReached && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900">You've reached your client limit</h3>
+              <p className="text-gray-600 mt-1">
+                Your current plan allows up to {limitReached.limit} clients. Upgrade to add more clients and unlock additional features.
+              </p>
+              <div className="mt-4 flex gap-3">
+                <a
+                  href={limitReached.upgradeUrl}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  Upgrade Plan
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setLimitReached(null)}
+                  className="px-4 py-2 text-gray-600 font-medium hover:text-gray-900 transition-colors"
+                >
+                  Maybe Later
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -11,8 +11,8 @@ interface Tier {
   limits: {
     maxClients: number;
     maxNotesPerMonth: number;
-    features: string[];
   };
+  features: string[];
 }
 
 interface Subscription {
@@ -81,7 +81,10 @@ export default function SettingsBilling() {
       const res = await apiFetch('/api/billing/pricing');
       if (res.ok) {
         const data = await res.json();
+        console.log('Pricing data received:', JSON.stringify(data, null, 2));
         setTiers(data.tiers);
+      } else {
+        console.error('Pricing API returned error:', res.status);
       }
     } catch (err) {
       console.error('Failed to load pricing:', err);
@@ -89,6 +92,7 @@ export default function SettingsBilling() {
   }
 
   async function handleUpgrade(priceId: string) {
+    console.log('handleUpgrade called with priceId:', priceId);
     setUpgrading(true);
     try {
       const res = await apiFetch('/api/billing/checkout', {
@@ -96,9 +100,14 @@ export default function SettingsBilling() {
         body: JSON.stringify({ priceId })
       });
 
+      console.log('Checkout response status:', res.status);
+      const data = await res.json();
+      console.log('Checkout response data:', data);
+
       if (res.ok) {
-        const data = await res.json();
         window.location.href = data.url;
+      } else {
+        alert(data.error || 'Failed to start checkout');
       }
     } catch (err) {
       console.error('Failed to start checkout:', err);
@@ -276,7 +285,7 @@ export default function SettingsBilling() {
                       </svg>
                       {tier.limits.maxNotesPerMonth === -1 ? 'Unlimited' : tier.limits.maxNotesPerMonth} notes/month
                     </li>
-                    {tier.limits.features.map(feature => (
+                    {tier.features.map(feature => (
                       <li key={feature} className="flex items-center gap-2 text-sm text-gray-600">
                         <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

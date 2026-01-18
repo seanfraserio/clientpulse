@@ -407,6 +407,10 @@ function parseNote(row: unknown): Note {
     attendees: JSON.parse(r.attendees as string || '[]'),
     ai_risk_signals: JSON.parse(r.ai_risk_signals as string || '[]'),
     ai_personal_details: JSON.parse(r.ai_personal_details as string || '[]'),
-    ai_topics: JSON.parse(r.ai_topics as string || '[]')
+    ai_topics: JSON.parse(r.ai_topics as string || '[]'),
+    ai_key_insights: JSON.parse(r.ai_key_insights as string || '[]'),
+    ai_relationship_signals: JSON.parse(r.ai_relationship_signals as string || '[]'),
+    ai_follow_up_recommendations: JSON.parse(r.ai_follow_up_recommendations as string || '[]'),
+    ai_communication_style: r.ai_communication_style as string | null
   } as Note;
 }

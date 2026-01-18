@@ -87,9 +87,13 @@ export interface Note {
   ai_error: string | null;
   ai_summary: string | null;
   ai_risk_signals: string[];
-  ai_personal_details: string[];
+  ai_personal_details: string[]; // Deprecated - kept for backward compatibility
   ai_sentiment_score: number | null;
   ai_topics: string[];
+  ai_key_insights: string[];
+  ai_relationship_signals: string[];
+  ai_follow_up_recommendations: string[];
+  ai_communication_style: string | null;
   embedding_id: string | null;
 
   // Metadata
@@ -181,15 +185,24 @@ export interface PaginatedResponse<T> {
 }
 
 // Radar Dashboard
+export interface OverdueAction {
+  id: string;
+  description: string;
+  client_id: string;
+  client_name: string;
+  due_date: string;
+  days_overdue: number;
+}
+
 export interface RadarData {
   attention: ClientWithStats[];
   watch: ClientWithStats[];
   healthy: ClientWithStats[];
-  overdueActions: ActionItem[];
+  overdueActions: OverdueAction[];
   stats: {
     totalClients: number;
     needsAttention: number;
-    openCommitments: number;
+    overdueActions: number;
   };
 }
 
@@ -247,6 +260,7 @@ export interface CreateActionInput {
 // ═══════════════════════════════════════════════════════════
 
 export interface AIAnalysis {
+  title: string;
   summary: string;
   action_items: {
     description: string;
@@ -254,10 +268,13 @@ export interface AIAnalysis {
     due_hint: 'today' | 'this week' | 'next week' | 'no specific date';
   }[];
   risk_signals: string[];
-  personal_details: string[];
+  personal_details: string[]; // Deprecated - kept for backward compatibility
   sentiment_score: number;
   topics: string[];
-  communication_insight?: string;
+  key_insights: string[];
+  relationship_signals: string[];
+  follow_up_recommendations: string[];
+  communication_style: string | null;
 }
 
 export interface AIProcessingMessage {
