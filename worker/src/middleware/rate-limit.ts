@@ -11,13 +11,52 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   // Authentication endpoints - strict limits
   'POST:/api/auth/magic-link': {
     requests: 5,
-    windowSeconds: 3600,  // 5 per hour per email/IP
+    windowSeconds: 3600,  // 5 per hour per IP
     keyGenerator: (c) => `magic:${c.req.header('CF-Connecting-IP') || 'unknown'}`
   },
   'GET:/api/auth/verify': {
     requests: 10,
     windowSeconds: 300,  // 10 per 5 minutes - prevent brute force
     keyGenerator: (c) => `verify:${c.req.header('CF-Connecting-IP') || 'unknown'}`
+  },
+  'POST:/api/auth/verify-magic-link': {
+    requests: 10,
+    windowSeconds: 300,  // 10 per 5 minutes - prevent brute force
+    keyGenerator: (c) => `verify-ml:${c.req.header('CF-Connecting-IP') || 'unknown'}`
+  },
+  'POST:/api/auth/exchange': {
+    requests: 10,
+    windowSeconds: 300,  // 10 per 5 minutes - prevent brute force on exchange codes
+    keyGenerator: (c) => `exchange:${c.req.header('CF-Connecting-IP') || 'unknown'}`
+  },
+
+  // OAuth endpoints - prevent abuse
+  'GET:/api/auth/oauth/google': {
+    requests: 10,
+    windowSeconds: 300,  // 10 per 5 minutes
+    keyGenerator: (c) => `oauth:google:${c.req.header('CF-Connecting-IP') || 'unknown'}`
+  },
+  'GET:/api/auth/oauth/github': {
+    requests: 10,
+    windowSeconds: 300,  // 10 per 5 minutes
+    keyGenerator: (c) => `oauth:github:${c.req.header('CF-Connecting-IP') || 'unknown'}`
+  },
+  'GET:/api/auth/oauth/google/callback': {
+    requests: 10,
+    windowSeconds: 300,  // 10 per 5 minutes - prevent callback abuse
+    keyGenerator: (c) => `oauth:google:cb:${c.req.header('CF-Connecting-IP') || 'unknown'}`
+  },
+  'GET:/api/auth/oauth/github/callback': {
+    requests: 10,
+    windowSeconds: 300,  // 10 per 5 minutes - prevent callback abuse
+    keyGenerator: (c) => `oauth:github:cb:${c.req.header('CF-Connecting-IP') || 'unknown'}`
+  },
+
+  // Webhook endpoints - rate limit to prevent abuse while allowing legitimate traffic
+  'POST:/api/webhooks/stripe': {
+    requests: 100,
+    windowSeconds: 60,  // 100 per minute - Stripe may send bursts during checkout
+    keyGenerator: (c) => `webhook:stripe:${c.req.header('CF-Connecting-IP') || 'unknown'}`
   },
 
   // Search - expensive operation
@@ -34,11 +73,33 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
     keyGenerator: (c) => `briefing:${c.get('user')?.id || c.req.header('CF-Connecting-IP')}`
   },
 
+  // Note creation - triggers AI processing, expensive
+  'POST:/api/notes': {
+    requests: 50,
+    windowSeconds: 3600,  // 50 per hour - reasonable for heavy note-takers
+    keyGenerator: (c) => `notes:${c.get('user')?.id || c.req.header('CF-Connecting-IP')}`
+  },
+
   // Billing endpoints - sensitive
   'POST:/api/billing/checkout': {
     requests: 10,
     windowSeconds: 3600,
     keyGenerator: (c) => `checkout:${c.get('user')?.id || c.req.header('CF-Connecting-IP')}`
+  },
+  'POST:/api/billing/portal': {
+    requests: 10,
+    windowSeconds: 3600,  // 10 per hour - prevent portal spam
+    keyGenerator: (c) => `portal:${c.get('user')?.id || c.req.header('CF-Connecting-IP')}`
+  },
+  'POST:/api/billing/cancel': {
+    requests: 5,
+    windowSeconds: 3600,  // 5 per hour - sensitive operation
+    keyGenerator: (c) => `cancel:${c.get('user')?.id || c.req.header('CF-Connecting-IP')}`
+  },
+  'POST:/api/billing/resume': {
+    requests: 5,
+    windowSeconds: 3600,  // 5 per hour - sensitive operation
+    keyGenerator: (c) => `resume:${c.get('user')?.id || c.req.header('CF-Connecting-IP')}`
   }
 };
 

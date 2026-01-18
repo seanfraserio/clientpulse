@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { generateToken, generateId, sha256 } from '../utils/crypto';
+import { auditAuthSuccess } from '../services/audit';
 import type { AppEnv } from '../index';
 import type { OAuthProvider } from '@shared/types';
 
@@ -164,13 +165,15 @@ async function createSessionAndRedirect(
 
   // Create one-time exchange code (expires in 5 minutes)
   // This prevents session token from appearing in URL
+  // Hash the code for secure storage
   const exchangeCode = generateToken(16);
+  const exchangeCodeHash = await sha256(exchangeCode);
   const exchangeExpires = new Date(Date.now() + 5 * 60 * 1000);
 
   await c.env.DB.prepare(`
-    INSERT INTO exchange_codes (id, code, session_token_hash, expires_at)
-    VALUES (?, ?, ?, ?)
-  `).bind(generateId(), exchangeCode, sessionTokenHash, exchangeExpires.toISOString()).run();
+    INSERT INTO exchange_codes (id, code, code_hash, session_token_hash, expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(generateId(), exchangeCode, exchangeCodeHash, sessionTokenHash, exchangeExpires.toISOString()).run();
 
   // Redirect to frontend verify page with exchange code (not session token!)
   return c.redirect(`${c.env.APP_URL}/auth/verify?code=${exchangeCode}`);
@@ -273,6 +276,9 @@ oauth.get('/google/callback', async (c) => {
       userData.name || null,
       userData.picture || null
     );
+
+    // Audit log the successful OAuth login
+    await auditAuthSuccess(c.env.DB, userId, 'oauth_google', c);
 
     return createSessionAndRedirect(c, userId);
   } catch (err) {
@@ -420,6 +426,9 @@ oauth.get('/github/callback', async (c) => {
       userData.name || userData.login,
       userData.avatar_url
     );
+
+    // Audit log the successful OAuth login
+    await auditAuthSuccess(c.env.DB, userId, 'oauth_github', c);
 
     return createSessionAndRedirect(c, userId);
   } catch (err) {

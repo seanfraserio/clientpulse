@@ -67,6 +67,7 @@ GEMINI_MODEL = "gemini-1.5-flash"
 [triggers]
 crons = [
   "0 * * * *",   # Every hour - check for daily digests to send
+  "0 2 * * *",   # 2am UTC - nightly security cleanup (expired tokens, sessions)
   "0 3 * * *"    # 3am UTC - nightly health recalculation
 ]
 

@@ -16,8 +16,9 @@ import webhooks from './routes/webhooks';
 import { authMiddleware } from './middleware/auth';
 import { rateLimitMiddleware } from './middleware/rate-limit';
 import { contentTypeMiddleware } from './middleware/content-type';
+import { csrfMiddleware } from './middleware/csrf';
 import { handleAIQueue } from './services/queue';
-import { sendDueDigests, recalculateAllHealth } from './services/cron';
+import { sendDueDigests, recalculateAllHealth, cleanupExpiredTokens } from './services/cron';
 
 // ═══════════════════════════════════════════════════════════
 // Type Definitions
@@ -67,7 +68,30 @@ const app = new Hono<AppEnv>();
 
 // Global middleware
 app.use('*', logger());
-app.use('*', secureHeaders());
+app.use('*', secureHeaders({
+  // Prevent MIME type sniffing
+  xContentTypeOptions: 'nosniff',
+  // Prevent clickjacking
+  xFrameOptions: 'DENY',
+  // Control referrer information
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  // Strict transport security (HTTPS only)
+  strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+  // Prevent XSS attacks
+  xXssProtection: '1; mode=block',
+  // Content Security Policy for API (restrictive) - use object format
+  contentSecurityPolicy: {
+    defaultSrc: ["'none'"],
+    frameAncestors: ["'none'"],
+  },
+  // Permissions Policy - disable unnecessary features
+  permissionsPolicy: {
+    camera: [],
+    microphone: [],
+    geolocation: [],
+    payment: [],
+  },
+}));
 app.use('*', cors({
   origin: (origin, c) => {
     const allowed = [c.env.APP_URL, 'http://localhost:4321', 'http://localhost:3000'];
@@ -75,8 +99,9 @@ app.use('*', cors({
   },
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  exposeHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  exposeHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-CSRF-Token'],
+  maxAge: 86400, // Cache preflight for 24 hours
 }));
 
 // Rate limiting (applied after CORS for preflight requests)
@@ -87,11 +112,8 @@ app.use('/api/*', rateLimitMiddleware);
 // ═══════════════════════════════════════════════════════════
 
 app.get('/health', (c) => {
-  return c.json({
-    status: 'ok',
-    environment: c.env.ENVIRONMENT,
-    timestamp: new Date().toISOString()
-  });
+  // Minimal health check response - don't expose environment details
+  return c.json({ status: 'ok' });
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -108,6 +130,7 @@ app.route('/api/webhooks', webhooks);
 
 const protectedApi = new Hono<AppEnv>();
 protectedApi.use('*', contentTypeMiddleware);
+protectedApi.use('*', csrfMiddleware);
 protectedApi.use('*', authMiddleware);
 
 protectedApi.route('/clients', clients);
@@ -167,6 +190,12 @@ export default {
         // Hourly: Check for daily digests to send
         console.log('[Scheduled] Running hourly digest check');
         ctx.waitUntil(sendDueDigests(env));
+        break;
+
+      case '0 2 * * *':
+        // 2am UTC: Nightly security cleanup
+        console.log('[Scheduled] Running nightly security cleanup');
+        ctx.waitUntil(cleanupExpiredTokens(env));
         break;
 
       case '0 3 * * *':

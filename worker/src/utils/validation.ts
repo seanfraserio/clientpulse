@@ -52,3 +52,30 @@ export function parseLimit(value: string | undefined, defaultValue: number = 50,
   if (isNaN(parsed) || parsed < 1) return defaultValue;
   return Math.min(parsed, max);
 }
+
+/**
+ * Validate Stripe price ID format (price_xxx or test mode prices)
+ */
+export function isValidStripePriceId(priceId: string): boolean {
+  // Stripe price IDs start with "price_" followed by alphanumeric chars
+  return /^price_[a-zA-Z0-9]{10,}$/.test(priceId);
+}
+
+/**
+ * Validate email format (stricter than just regex)
+ */
+export function isValidEmail(email: string): boolean {
+  if (!email || email.length > 255) return false;
+  // Basic email validation - RFC 5322 simplified
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Validate cursor string (prevent injection)
+ */
+export function isValidCursor(cursor: string | undefined): boolean {
+  if (!cursor) return true; // Optional
+  // Cursors should be alphanumeric with allowed chars (base64 or IDs)
+  return /^[a-zA-Z0-9_=-]{1,100}$/.test(cursor);
+}

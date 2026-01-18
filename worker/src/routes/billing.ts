@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import Stripe from 'stripe';
 import { PRICING_TIERS, getTierByPlan } from '@shared/billing';
+import { isValidStripePriceId } from '../utils/validation';
 import type { AppEnv } from '../index';
 import type { User } from '@shared/types';
 
@@ -54,10 +55,15 @@ billing.get('/pricing', async (c) => {
 
 billing.post('/checkout', async (c) => {
   const user = c.get('user') as User;
-  const { priceId } = await c.req.json();
+  const body = await c.req.json();
+  const priceId = body?.priceId;
 
-  if (!priceId) {
+  if (!priceId || typeof priceId !== 'string') {
     return c.json({ error: 'Price ID required' }, 400);
+  }
+
+  if (!isValidStripePriceId(priceId)) {
+    return c.json({ error: 'Invalid price ID format' }, 400);
   }
 
   const stripe = new Stripe(c.env.STRIPE_SECRET_KEY);

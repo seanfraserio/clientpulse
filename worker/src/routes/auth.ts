@@ -3,6 +3,7 @@ import { setCookie, deleteCookie } from 'hono/cookie';
 import { z } from 'zod';
 import { generateToken, generateId, sha256 } from '../utils/crypto';
 import { isValidHttpsUrl } from '../utils/validation';
+import { auditAuthSuccess, auditAuthFailure } from '../services/audit';
 import type { AppEnv } from '../index';
 
 const auth = new Hono<AppEnv>();
@@ -106,8 +107,9 @@ auth.post('/magic-link', async (c) => {
     return c.json({ error: 'Configuration error' }, 500);
   }
 
-  // Build magic link URL
-  const magicLinkUrl = `${appUrl}/api/auth/verify?token=${token}`;
+  // Build magic link URL - goes to frontend page which POSTs to API
+  // This prevents the token from appearing in server logs via GET requests
+  const magicLinkUrl = `${appUrl}/auth/verify?token=${token}`;
 
   // In development, log the link
   if (c.env.ENVIRONMENT === 'development') {
@@ -255,6 +257,80 @@ auth.get('/verify', async (c) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// POST /api/auth/verify-magic-link - Verify magic link via POST
+// Prevents token from appearing in server logs via GET requests
+// ═══════════════════════════════════════════════════════════
+
+auth.post('/verify-magic-link', async (c) => {
+  const body = await c.req.json();
+  const token = body.token;
+
+  if (!token || typeof token !== 'string') {
+    return c.json({ error: 'Missing token' }, 400);
+  }
+
+  // Hash the incoming token to look up in database
+  const tokenHash = await sha256(token);
+
+  // Find valid magic link token by hash (with fallback to plain token for migration)
+  let authToken = await c.env.DB.prepare(`
+    SELECT * FROM auth_tokens
+    WHERE token_hash = ?
+      AND type = 'magic_link'
+      AND expires_at > datetime('now')
+      AND used_at IS NULL
+  `).bind(tokenHash).first();
+
+  // Fallback for tokens created before migration
+  if (!authToken) {
+    authToken = await c.env.DB.prepare(`
+      SELECT * FROM auth_tokens
+      WHERE token = ?
+        AND type = 'magic_link'
+        AND expires_at > datetime('now')
+        AND used_at IS NULL
+    `).bind(token).first();
+  }
+
+  if (!authToken) {
+    return c.json({ error: 'Invalid or expired token' }, 400);
+  }
+
+  // Mark magic link as used
+  await c.env.DB.prepare(`
+    UPDATE auth_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).bind(authToken.id).run();
+
+  // Create session token with absolute timeout
+  const sessionToken = generateToken(32);
+  const sessionTokenHash = await sha256(sessionToken);
+  const sessionExpires = new Date(Date.now() + SESSION_TIMEOUT_MS);
+  const absoluteExpires = new Date(Date.now() + ABSOLUTE_SESSION_TIMEOUT_MS);
+
+  await c.env.DB.prepare(`
+    INSERT INTO auth_tokens (id, user_id, token, token_hash, type, expires_at, absolute_expires_at)
+    VALUES (?, ?, ?, ?, 'session', ?, ?)
+  `).bind(
+    generateId(),
+    authToken.user_id,
+    sessionToken,
+    sessionTokenHash,
+    sessionExpires.toISOString(),
+    absoluteExpires.toISOString()
+  ).run();
+
+  // Update user's last login
+  await c.env.DB.prepare(`
+    UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).bind(authToken.user_id).run();
+
+  // Audit log the successful login
+  await auditAuthSuccess(c.env.DB, authToken.user_id as string, 'magic_link', c);
+
+  return c.json({ sessionToken, success: true });
+});
+
+// ═══════════════════════════════════════════════════════════
 // POST /api/auth/logout - Clear session
 // ═══════════════════════════════════════════════════════════
 
@@ -324,13 +400,26 @@ auth.post('/exchange', async (c) => {
     return c.json({ error: 'Missing code' }, 400);
   }
 
-  // Find and validate exchange code
-  const exchangeRecord = await c.env.DB.prepare(`
+  // Hash the code for lookup
+  const codeHash = await sha256(code);
+
+  // Find and validate exchange code by hash first, fallback to plaintext for migration
+  let exchangeRecord = await c.env.DB.prepare(`
     SELECT * FROM exchange_codes
-    WHERE code = ?
+    WHERE code_hash = ?
       AND expires_at > datetime('now')
       AND used_at IS NULL
-  `).bind(code).first();
+  `).bind(codeHash).first();
+
+  // Fallback for codes created before hash migration
+  if (!exchangeRecord) {
+    exchangeRecord = await c.env.DB.prepare(`
+      SELECT * FROM exchange_codes
+      WHERE code = ?
+        AND expires_at > datetime('now')
+        AND used_at IS NULL
+    `).bind(code).first();
+  }
 
   if (!exchangeRecord) {
     return c.json({ error: 'Invalid or expired code' }, 400);

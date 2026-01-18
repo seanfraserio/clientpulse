@@ -28,9 +28,31 @@ export function removeSessionToken(): void {
 }
 
 /**
+ * Get CSRF token from cookie
+ */
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/csrf_token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Store CSRF token from response header
+ */
+function updateCsrfToken(response: Response): void {
+  const csrfToken = response.headers.get('X-CSRF-Token');
+  if (csrfToken && typeof document !== 'undefined') {
+    // Update the cookie if the server sent a new token
+    const isSecure = window.location.protocol === 'https:';
+    document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Strict${isSecure ? '; Secure' : ''}; max-age=86400`;
+  }
+}
+
+/**
  * Fetch wrapper that automatically handles:
  * - Full API URL
  * - Authorization header with session token
+ * - CSRF token for state-changing requests
  * - JSON content type for POST/PUT/PATCH
  */
 export async function apiFetch(
@@ -53,6 +75,16 @@ export async function apiFetch(
     headers['Authorization'] = `Bearer ${sessionToken}`;
   }
 
+  // Add CSRF token for state-changing requests
+  const method = (options.method || 'GET').toUpperCase();
+  const stateChangingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+  if (stateChangingMethods.includes(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+
   // Add JSON content type for requests with body
   if (options.body && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
@@ -61,7 +93,13 @@ export async function apiFetch(
   const defaultOptions: RequestInit = {
     ...options,
     headers,
+    credentials: 'include', // Include cookies for CSRF
   };
 
-  return fetch(url, defaultOptions);
+  const response = await fetch(url, defaultOptions);
+
+  // Update CSRF token from response if present
+  updateCsrfToken(response);
+
+  return response;
 }

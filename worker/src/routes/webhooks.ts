@@ -15,8 +15,13 @@ webhooks.post('/stripe', async (c) => {
   const signature = c.req.header('stripe-signature');
   const payload = await c.req.text();
 
+  // Return same generic response for all authentication failures
+  // to prevent information disclosure to attackers
+  const authFailedResponse = () => c.json({ error: 'Unauthorized' }, 401);
+
   if (!signature) {
-    return c.json({ error: 'Missing signature' }, 400);
+    console.warn('[Webhook] Missing Stripe signature header');
+    return authFailedResponse();
   }
 
   let event: Stripe.Event;
@@ -28,8 +33,9 @@ webhooks.post('/stripe', async (c) => {
       c.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error('Webhook signature verification failed:', err);
-    return c.json({ error: 'Invalid signature' }, 400);
+    // Log minimally - don't expose error details that could help attackers
+    console.warn('[Webhook] Signature verification failed');
+    return authFailedResponse();
   }
 
   // Check for duplicate events (idempotency)

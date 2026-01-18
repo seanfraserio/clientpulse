@@ -7,6 +7,68 @@ import {
 } from './digest';
 
 // ═══════════════════════════════════════════════════════════
+// Security Cleanup
+// Runs nightly to clean up expired tokens and sessions
+// ═══════════════════════════════════════════════════════════
+
+export async function cleanupExpiredTokens(env: Env): Promise<void> {
+  console.log('[Cron] Starting security cleanup');
+
+  try {
+    // Delete expired magic link tokens (older than 1 hour)
+    const magicLinkResult = await env.DB.prepare(`
+      DELETE FROM auth_tokens
+      WHERE type = 'magic_link'
+        AND (expires_at < datetime('now', '-1 hour') OR used_at IS NOT NULL)
+    `).run();
+    console.log(`[Cron] Cleaned up ${magicLinkResult.meta.changes} magic link tokens`);
+
+    // Delete expired sessions (older than 1 day past expiry)
+    const sessionResult = await env.DB.prepare(`
+      DELETE FROM auth_tokens
+      WHERE type = 'session'
+        AND (expires_at < datetime('now', '-1 day')
+             OR (absolute_expires_at IS NOT NULL AND absolute_expires_at < datetime('now', '-1 day'))
+             OR used_at IS NOT NULL)
+    `).run();
+    console.log(`[Cron] Cleaned up ${sessionResult.meta.changes} expired sessions`);
+
+    // Delete expired exchange codes (older than 1 hour)
+    const exchangeResult = await env.DB.prepare(`
+      DELETE FROM exchange_codes
+      WHERE expires_at < datetime('now', '-1 hour') OR used_at IS NOT NULL
+    `).run();
+    console.log(`[Cron] Cleaned up ${exchangeResult.meta.changes} exchange codes`);
+
+    // Delete expired OAuth states (older than 1 hour)
+    const oauthStateResult = await env.DB.prepare(`
+      DELETE FROM oauth_states
+      WHERE expires_at < datetime('now', '-1 hour')
+    `).run();
+    console.log(`[Cron] Cleaned up ${oauthStateResult.meta.changes} OAuth states`);
+
+    // Clean up old audit logs (older than 90 days)
+    const auditResult = await env.DB.prepare(`
+      DELETE FROM audit_log
+      WHERE created_at < datetime('now', '-90 days')
+    `).run();
+    console.log(`[Cron] Cleaned up ${auditResult.meta.changes} old audit logs`);
+
+    // Clean up old health snapshots (older than 90 days)
+    const snapshotResult = await env.DB.prepare(`
+      DELETE FROM health_snapshots
+      WHERE snapshot_date < date('now', '-90 days')
+    `).run();
+    console.log(`[Cron] Cleaned up ${snapshotResult.meta.changes} old health snapshots`);
+
+    console.log('[Cron] Security cleanup complete');
+  } catch (error) {
+    console.error('[Cron] Error in cleanupExpiredTokens:', error);
+    throw error;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // Send Due Digests
 // Runs hourly to send daily digests to users at their preferred time
 // ═══════════════════════════════════════════════════════════

@@ -97,7 +97,13 @@ import Layout from '../../layouts/Layout.astro';
   }
 
   async function verifyMagicLink(token: string): Promise<string> {
-    const res = await fetch(`${API_URL}/api/auth/verify?token=${encodeURIComponent(token)}&returnToken=true`);
+    // Use POST to prevent magic link token from appearing in server logs
+    const res = await fetch(`${API_URL}/api/auth/verify-magic-link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+
     const data = await res.json();
 
     if (!res.ok) {
