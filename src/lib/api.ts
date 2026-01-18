@@ -28,23 +28,20 @@ export function removeSessionToken(): void {
 }
 
 /**
- * Get CSRF token from cookie
+ * Get CSRF token from localStorage (works cross-origin)
  */
 function getCsrfToken(): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(/csrf_token=([^;]+)/);
-  return match ? match[1] : null;
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('csrf_token');
 }
 
 /**
- * Store CSRF token from response header
+ * Store CSRF token from response header into localStorage
  */
 function updateCsrfToken(response: Response): void {
   const csrfToken = response.headers.get('X-CSRF-Token');
-  if (csrfToken && typeof document !== 'undefined') {
-    // Update the cookie if the server sent a new token
-    const isSecure = window.location.protocol === 'https:';
-    document.cookie = `csrf_token=${csrfToken}; path=/; SameSite=Strict${isSecure ? '; Secure' : ''}; max-age=86400`;
+  if (csrfToken && typeof window !== 'undefined') {
+    localStorage.setItem('csrf_token', csrfToken);
   }
 }
 

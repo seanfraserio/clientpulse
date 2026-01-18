@@ -72,9 +72,14 @@ export default function ClientDetail({ clientId }: Props) {
 
       if (res.ok) {
         setClient({ ...client, digest_enabled: !client.digest_enabled });
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.error('Failed to toggle digest:', res.status, errorData);
+        alert(`Failed to update digest setting: ${errorData.error || res.statusText}`);
       }
     } catch (err) {
       console.error('Failed to toggle digest:', err);
+      alert('Failed to update digest setting. Please try again.');
     } finally {
       setDigestToggling(false);
     }

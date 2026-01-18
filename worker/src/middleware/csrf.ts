@@ -1,10 +1,9 @@
 import { Context, Next } from 'hono';
-import { getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv } from '../index';
 
-const CSRF_COOKIE_NAME = 'csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const CSRF_TOKEN_LENGTH = 32;
+const CSRF_TOKEN_TTL = 24 * 60 * 60; // 24 hours in seconds
 
 /**
  * Generate a cryptographically secure random token
@@ -16,12 +15,13 @@ function generateCsrfToken(): string {
 }
 
 /**
- * CSRF protection middleware using double-submit cookie pattern
+ * CSRF protection middleware using session-bound tokens
  *
- * How it works:
- * 1. On any request, if no CSRF cookie exists, set one
- * 2. On state-changing requests (POST, PUT, PATCH, DELETE), require
- *    the X-CSRF-Token header to match the cookie value
+ * How it works (cross-origin compatible):
+ * 1. Extract session token from Authorization header
+ * 2. Use session token to look up/store CSRF token in KV cache
+ * 3. On state-changing requests, validate the header token against cached token
+ * 4. Return CSRF token in response header for client to store in localStorage
  *
  * Exempt endpoints:
  * - Webhook endpoints (use signature verification instead)
@@ -48,22 +48,32 @@ export async function csrfMiddleware(c: Context<AppEnv>, next: Next) {
     return;
   }
 
-  // Get existing CSRF token from cookie
-  let csrfToken = getCookie(c, CSRF_COOKIE_NAME);
+  // Get session token from Authorization header to use as CSRF key
+  const authHeader = c.req.header('Authorization');
+  const sessionToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+  if (!sessionToken) {
+    // No session token means unauthenticated request - skip CSRF
+    // (auth middleware will handle rejecting if needed)
+    await next();
+    return;
+  }
+
+  // Create a hash of the session token for the KV key (don't store raw tokens)
+  const encoder = new TextEncoder();
+  const data = encoder.encode(sessionToken);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const sessionHash = hashArray.slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
+  const csrfKey = `csrf:${sessionHash}`;
+
+  // Get existing CSRF token from KV cache
+  let csrfToken = await c.env.CACHE.get(csrfKey);
 
   // Generate new token if none exists
   if (!csrfToken) {
     csrfToken = generateCsrfToken();
-
-    // Set CSRF cookie with secure attributes
-    const isProduction = c.env.ENVIRONMENT === 'production';
-    setCookie(c, CSRF_COOKIE_NAME, csrfToken, {
-      httpOnly: false,  // Must be readable by JavaScript
-      secure: isProduction,
-      sameSite: 'Strict',
-      path: '/',
-      maxAge: 24 * 60 * 60  // 24 hours
-    });
+    await c.env.CACHE.put(csrfKey, csrfToken, { expirationTtl: CSRF_TOKEN_TTL });
   }
 
   // For state-changing methods, validate CSRF token

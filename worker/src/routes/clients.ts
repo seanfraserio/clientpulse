@@ -249,12 +249,11 @@ clients.patch('/:id/digest', async (c) => {
     return c.json({ error: 'Client not found' }, 404);
   }
 
-  // Update digest_enabled - need direct DB access for this specific field
+  // Update digest_enabled using direct DB access
   const user = c.get('user') as User;
-  const rawDb = (c.env as { DB: D1Database }).DB;
 
-  await rawDb.prepare(`
-    UPDATE clients SET digest_enabled = ? WHERE id = ? AND user_id = ?
+  await c.env.DB.prepare(`
+    UPDATE clients SET digest_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?
   `).bind(enabled ? 1 : 0, clientId, user.id).run();
 
   return c.json({

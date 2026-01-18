@@ -58,7 +58,7 @@ binding = "AI"
 ENVIRONMENT = "production"
 APP_URL = "https://clientpulse.pages.dev"
 API_URL = "https://clientpulse-api.sfraser.workers.dev"
-FROM_EMAIL = "ClientPulse <hello@clientpulse.app>"
+FROM_EMAIL = "ClientPulse <onboarding@resend.dev>"
 GEMINI_MODEL = "gemini-1.5-flash"
 
 # ═══════════════════════════════════════════════════════════
