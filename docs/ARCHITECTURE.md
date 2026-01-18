@@ -586,5 +586,5 @@ Daily digests include:
 | Plan | Features |
 |------|----------|
 | Free | 5 clients, basic features |
-| Pro | Unlimited clients, AI analysis, digests |
+| Pro | Up to 500 clients, AI analysis, digests |
 | Team | Multi-user, shared clients |

@@ -31,7 +31,7 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
     stripePriceIdMonthly: 'price_1SqdCGIFGLyh2AD2A0mB1wbQ',
     stripePriceIdYearly: 'price_1SqdLuIFGLyh2AD2zXyJqdM3',
     limits: {
-      maxClients: 50,
+      maxClients: 500,
       maxNotesPerMonth: 500,
       aiProcessingEnabled: true,
       semanticSearchEnabled: true,
@@ -40,7 +40,7 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
       exportEnabled: true
     },
     features: [
-      'Up to 50 clients',
+      'Up to 500 clients',
       'Unlimited notes',
       'AI-powered insights',
       'Semantic search',
